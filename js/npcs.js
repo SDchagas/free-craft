@@ -424,7 +424,12 @@
       const b = Game.world.get(Math.floor(cx + 0.5), Math.floor(cy + 0.5), Math.floor(cz + 0.5));
       if (!b) continue;
       const d = Game.items[b];
-      if (d.liquid || d.passable) continue;
+      if (d.passable) continue;
+      // animais aquáticos podem entrar na água; terrestres tratam como obstáculo
+      if (d.liquid) {
+        if (npc.aquatic) continue;
+        return true;
+      }
       return true;
     }
     return false;
@@ -642,10 +647,44 @@
     for (const n of list) if (n.hostile) c++;
     return c;
   }
+  function passiveCount() {
+    let c = 0;
+    for (const n of list) {
+      if (!n.hostile && !n.flying && !n.aquatic && n.kind !== 'golem') c++;
+    }
+    return c;
+  }
+
+  function spawnPassiveNearby() {
+    const ang = Math.random() * Math.PI * 2;
+    const dist = 14 + Math.random() * 10;
+    const x = Math.round(Game.player.pos.x + Math.cos(ang) * dist);
+    const z = Math.round(Game.player.pos.z + Math.sin(ang) * dist);
+    Game.world.ensureChunksAround(x, z);
+    const kinds = ['cow', 'pig', 'sheep', 'sheep', 'horse', 'rat'];
+    const kind = kinds[Math.floor(Math.random() * kinds.length)];
+    spawnAtSurface(x, z, { kind });
+  }
+
+  // Despawna mobs muito longe do player pra controlar a quantidade total.
+  // Não remove golem (defender invocado) nem mobs com nome especial.
+  function despawnFar(maxDist = 60) {
+    const px = Game.player.pos.x, pz = Game.player.pos.z;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const n = list[i];
+      if (n.kind === 'golem') continue;  // golem fica
+      const d = Math.hypot(n.pos.x - px, n.pos.z - pz);
+      if (d > maxDist) {
+        if (n.mesh && n.mesh.parent) n.mesh.parent.remove(n.mesh);
+        list.splice(i, 1);
+      }
+    }
+  }
 
   Game.npcs = {
     list, bindScene, spawn, spawnAtSurface, spawnInitial,
     spawnTomNearby, spawnHostileNearby, spawnBird, spawnFish, spawnGolemAt,
-    update, damage, tomCount, hostileCount,
+    spawnPassiveNearby, despawnFar,
+    update, damage, tomCount, hostileCount, passiveCount,
   };
 })();

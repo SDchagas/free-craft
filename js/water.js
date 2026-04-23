@@ -81,23 +81,28 @@
     return flowMat;
   }
 
+  // Mapeia nível 1..8 → altura do mesh (pra ter superfície quase nivelada)
+  function heightForLevel(level) {
+    // source (8) = 0.92  (deixa um espacinho de 0.08 no topo, evitando "levantado")
+    // 7 = 0.85, 6 = 0.75, 5 = 0.65, 4 = 0.55, 3 = 0.45, 2 = 0.30, 1 = 0.18
+    if (level >= 8) return 0.92;
+    const map = { 7: 0.85, 6: 0.75, 5: 0.65, 4: 0.55, 3: 0.45, 2: 0.30, 1: 0.18 };
+    return map[level] || 0.18;
+  }
+
   function refreshFlowMesh(x, y, z, level) {
     const key = K(x, y, z);
-    // se source/queda → remove mesh fino, deixa o cubo padrão
-    if (level >= SOURCE_LEVEL) {
-      removeFlowMesh(x, y, z);
-      return;
-    }
-    // mesh fino: altura = level/8 do bloco
-    const h = Math.max(0.12, level / 8);
-    const yOffset = -0.5 + h / 2;  // base no fundo do bloco
+    // Se há ar embaixo (queda), faz mesh cheio (água caindo é coluna)
+    const blockBelow = Game.world.get(x, y - 1, z);
+    const falling = blockBelow === 0 || blockBelow === WATER_ID;
+    const h = falling ? 1.0 : heightForLevel(level);
+    const yOffset = -0.5 + h / 2;
     let m = flowMeshes.get(key);
     if (m) {
-      // ajusta scale + posição
       m.scale.y = h;
       m.position.y = y + yOffset;
     } else {
-      const geo = new THREE.BoxGeometry(0.96, 1.0, 0.96);  // y=1 base, escala depois
+      const geo = new THREE.BoxGeometry(0.99, 1.0, 0.99);
       m = new THREE.Mesh(geo, getFlowMaterial());
       m.position.set(x, y + yOffset, z);
       m.scale.y = h;
@@ -209,16 +214,47 @@
   function initializeFromWorld() {
     for (const [key, t] of Game.world.data) {
       if (t === WATER_ID && !data.has(key)) {
-        // águas naturais do mapa = sources
         data.set(key, { level: SOURCE_LEVEL, source: true });
         pending.add(key);
       }
     }
+    // cria meshes pra TODA a água registrada (cubo padrão foi suprimido em world.render)
+    for (const [key, e] of data) {
+      const [x, y, z] = key.split(',').map(Number);
+      refreshFlowMesh(x, y, z, e.level);
+    }
+  }
+
+  // Quando um chunk é carregado/descarregado, criamos/removemos os meshes da água ali
+  function unloadChunk(cx, cz, CHUNK) {
+    for (const [key, m] of Array.from(flowMeshes.entries())) {
+      const [x, , z] = key.split(',').map(Number);
+      if (Math.floor(x / CHUNK) === cx && Math.floor(z / CHUNK) === cz) {
+        if (m.parent) m.parent.remove(m);
+        flowMeshes.delete(key);
+      }
+    }
+  }
+  function loadChunk(cx, cz, CHUNK) {
+    if (!Game.world) return;
+    const x0 = cx * CHUNK, z0 = cz * CHUNK;
+    for (let lx = 0; lx < CHUNK; lx++)
+      for (let lz = 0; lz < CHUNK; lz++)
+        for (let y = -9; y < 30; y++) {
+          if (Game.world.get(x0 + lx, y, z0 + lz) === WATER_ID) {
+            const e = data.get(K(x0 + lx, y, z0 + lz));
+            const lvl = e ? e.level : SOURCE_LEVEL;
+            // garante que está no data registry mesmo se gerado pelo chunk
+            if (!e) data.set(K(x0 + lx, y, z0 + lz), { level: SOURCE_LEVEL, source: true });
+            refreshFlowMesh(x0 + lx, y, z0 + lz, lvl);
+          }
+        }
   }
 
   Game.water = {
     WATER_ID, SOURCE_LEVEL, MAX_FLOW,
     update, placeSource, notifyNeighborChange, initializeFromWorld,
     getLevel, isSource, clearWater,
+    loadChunk, unloadChunk,
   };
 })();

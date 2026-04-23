@@ -123,9 +123,8 @@
     if (t === 35) return;  // muda
     if (t === 36) return;  // trigo
     if (t === 37) return;  // grama alta
-    // água com fluxo (level < SOURCE) usa mesh fino (water.js)
-    if (t === 7 && Game.water && Game.water.getLevel(x, y, z) < Game.water.SOURCE_LEVEL) {
-      // ainda assim apaga mesh velho se existir
+    // toda água tem mesh próprio gerenciado por water.js
+    if (t === 7) {
       const m = meshes.get(key);
       if (m) { if (m.parent) m.parent.remove(m); meshes.delete(key); }
       return;
@@ -356,6 +355,7 @@
     if (Game.fences)  Game.fences.loadChunk(cx, cz, CHUNK);
     if (Game.beds)    Game.beds.loadChunk(cx, cz, CHUNK);
     if (Game.plants)  Game.plants.loadChunk(cx, cz, CHUNK);
+    if (Game.water && Game.water.loadChunk) Game.water.loadChunk(cx, cz, CHUNK);
   }
 
   // Descarrega meshes do chunk (preserva DATA).
@@ -382,6 +382,7 @@
     if (Game.fences)  Game.fences.unloadChunk(cx, cz, CHUNK);
     if (Game.beds)    Game.beds.unloadChunk(cx, cz, CHUNK);
     if (Game.plants)  Game.plants.unloadChunk(cx, cz, CHUNK);
+    if (Game.water && Game.water.unloadChunk) Game.water.unloadChunk(cx, cz, CHUNK);
   }
 
   // Decide se chunk deve estar renderizado dada posição+olhar do player.

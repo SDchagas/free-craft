@@ -835,18 +835,26 @@
     return tryAxis('x') || tryAxis('z');
   }
 
-  // ---------- Spawn dinâmico (mob hostil à noite, pássaros/peixes de dia) ----------
-  let hostileSpawnT = 0, birdSpawnT = 0, fishSpawnT = 0;
+  // ---------- Spawn dinâmico ----------
+  // Mobs hostis à noite. Passivos durante o dia, em volta do player.
+  // Pássaros/peixes esporádicos. Despawn de mobs muito distantes.
+  let hostileSpawnT = 0, birdSpawnT = 0, fishSpawnT = 0, passiveSpawnT = 0, despawnT = 0;
   function maybeSpawn(dt) {
-    if (Game.player.mode === 'creative') return;  // sem spawn dinâmico em creative
+    if (Game.player.mode === 'creative') return;
     const isNight = Game.daynight.state.time < 0.20 || Game.daynight.state.time > 0.85;
     hostileSpawnT -= dt;
     birdSpawnT -= dt;
     fishSpawnT -= dt;
+    passiveSpawnT -= dt;
+    despawnT -= dt;
 
     if (isNight && hostileSpawnT <= 0 && Game.npcs.hostileCount() < 4) {
       Game.npcs.spawnHostileNearby();
       hostileSpawnT = 18 + Math.random() * 12;
+    }
+    if (!isNight && passiveSpawnT <= 0 && Game.npcs.passiveCount() < 8) {
+      Game.npcs.spawnPassiveNearby();
+      passiveSpawnT = 25 + Math.random() * 25;
     }
     if (!isNight && birdSpawnT <= 0) {
       Game.npcs.spawnBird();
@@ -855,6 +863,11 @@
     if (fishSpawnT <= 0) {
       Game.npcs.spawnFish();
       fishSpawnT = 25 + Math.random() * 20;
+    }
+    // Despawn de mobs muito longe (a cada 5s)
+    if (despawnT <= 0) {
+      Game.npcs.despawnFar(60);
+      despawnT = 5;
     }
   }
 

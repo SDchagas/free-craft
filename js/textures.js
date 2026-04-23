@@ -43,43 +43,43 @@
 
   TEX.woodSide = makeTex((ctx, s) => {
     const rng = mulberry32(333);
-    // base de fibras verticais (colunas)
+    // base de fibras verticais — paleta mais quente, sem tons quase pretos
     for (let x = 0; x < s; x++) {
       const r = rng();
-      ctx.fillStyle = r < 0.20 ? '#4a2810'
-                    : r < 0.45 ? '#6d4520'
-                    : r < 0.72 ? '#8b5a2b'
-                    : r < 0.92 ? '#a87030'
-                    :            '#c19062';
+      ctx.fillStyle = r < 0.20 ? '#6a4220'
+                    : r < 0.50 ? '#8b5a2b'
+                    : r < 0.78 ? '#a07038'
+                    : r < 0.95 ? '#b88350'
+                    :            '#c89968';
       ctx.fillRect(x, 0, 1, s);
     }
-    // sulcos verticais (sombras escuras)
-    for (let i = 0; i < 4; i++) {
-      const x = Math.floor(rng() * s);
-      ctx.fillStyle = 'rgba(40,20,8,0.55)';
-      ctx.fillRect(x, 0, 1, s);
-    }
-    // luzes finas (pixels claros aleatórios)
-    for (let i = 0; i < 18; i++) {
-      ctx.fillStyle = 'rgba(195,150,100,0.6)';
-      ctx.fillRect(Math.floor(rng() * s), Math.floor(rng() * s), 1, 2);
-    }
-    // anéis horizontais (faixas escuras irregulares)
+    // sulcos verticais opacos (cor mais natural, sem alpha)
     for (let i = 0; i < 3; i++) {
+      const x = Math.floor(rng() * s);
+      ctx.fillStyle = '#5a3818';
+      ctx.fillRect(x, 0, 1, s);
+    }
+    // luzes finas (pixels claros) — opacas
+    for (let i = 0; i < 14; i++) {
+      ctx.fillStyle = '#c89968';
+      ctx.fillRect(Math.floor(rng() * s), Math.floor(rng() * s), 1, 1);
+    }
+    // anéis horizontais sutis
+    for (let i = 0; i < 2; i++) {
       const y = 2 + Math.floor(rng() * (s - 4));
       const len = 6 + Math.floor(rng() * (s - 6));
       const x0 = Math.floor(rng() * (s - len));
-      ctx.fillStyle = '#3a1f0a';
+      ctx.fillStyle = '#5a3818';
       ctx.fillRect(x0, y, len, 1);
     }
-    // nó (knot) — círculo escuro pequeno
-    if (rng() < 0.7) {
+    // nó pequeno e suave (sem mais círculo quase preto)
+    if (rng() < 0.5) {
       const cx = 3 + Math.floor(rng() * (s - 6));
       const cy = 3 + Math.floor(rng() * (s - 6));
-      ctx.fillStyle = '#2a160a';
-      ctx.beginPath(); ctx.arc(cx, cy, 1.8, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#4a2810';
-      ctx.beginPath(); ctx.arc(cx + 0.5, cy + 0.5, 0.8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#5a3818';
+      ctx.beginPath(); ctx.arc(cx, cy, 1.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#7a4f25';
+      ctx.beginPath(); ctx.arc(cx + 0.5, cy + 0.3, 0.7, 0, Math.PI * 2); ctx.fill();
     }
   });
 
@@ -98,41 +98,36 @@
   function makeLeavesTex(seed, palette) {
     return makeTex((ctx, s) => {
       const rng = mulberry32(seed);
-      // base: começa transparente e pinta clusters de folha
+      // Tudo opaco ou totalmente transparente — evita manchas escuras
+      // que apareciam com semi-transparentes + alphaTest.
       ctx.clearRect(0, 0, s, s);
-      // fundo escuro (canopy interna)
-      ctx.fillStyle = palette.shadow;
+      // fundo verde-médio (sem mais o "shadow" muito escuro que ficava feio)
+      ctx.fillStyle = palette.mid;
       ctx.fillRect(0, 0, s, s);
-      // tufos densos (clusters de 2-4 pixels)
+      // tufos: variação ao redor do tom médio
       for (let i = 0; i < 50; i++) {
         const x = Math.floor(rng() * s);
         const y = Math.floor(rng() * s);
         const r = rng();
         const sz = r < 0.5 ? 2 : (r < 0.85 ? 3 : 4);
-        const col = r < 0.20 ? palette.dark
-                  : r < 0.55 ? palette.mid
-                  : r < 0.85 ? palette.light
-                             : palette.bright;
+        const col = r < 0.25 ? palette.dark
+                  : r < 0.60 ? palette.light
+                  : r < 0.88 ? palette.bright
+                             : palette.mid;
         ctx.fillStyle = col;
         ctx.fillRect(x, y, sz, sz);
       }
-      // pixels luminosos (refletindo sol)
-      for (let i = 0; i < 14; i++) {
+      // pixels brilhantes ocasionais
+      for (let i = 0; i < 10; i++) {
         ctx.fillStyle = palette.bright;
         ctx.fillRect(Math.floor(rng() * s), Math.floor(rng() * s), 1, 1);
       }
-      // muitos buracos pra silhueta natural (~30 por textura)
-      for (let i = 0; i < 30; i++) {
+      // buracos transparentes pra silhueta (~22 por textura, espalhados)
+      for (let i = 0; i < 22; i++) {
         const x = Math.floor(rng() * s);
         const y = Math.floor(rng() * s);
         ctx.clearRect(x, y, 1, 1);
-        if (rng() < 0.5) ctx.clearRect((x + 1) % s, y, 1, 1);
-        if (rng() < 0.3) ctx.clearRect(x, (y + 1) % s, 1, 1);
-      }
-      // sombras profundas
-      for (let i = 0; i < 14; i++) {
-        ctx.fillStyle = 'rgba(5,20,8,0.55)';
-        ctx.fillRect(Math.floor(rng() * s), Math.floor(rng() * s), 1, 1);
+        if (rng() < 0.4) ctx.clearRect((x + 1) % s, y, 1, 1);
       }
     });
   }

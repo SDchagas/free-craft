@@ -27,7 +27,7 @@
   defBlock(2,  { name: 'Terra',         tex: Array(6).fill(TEX.dirt), hardness: 0.5, tool: 'shovel' });
   defBlock(3,  { name: 'Pedra',         tex: Array(6).fill(TEX.stone), hardness: 1.5, requiresTool: 1, drop: 21, tool: 'pick' });
   defBlock(4,  { name: 'Tronco',        tex: [TEX.woodSide, TEX.woodSide, TEX.woodTop, TEX.woodTop, TEX.woodSide, TEX.woodSide], hardness: 2.0, tool: 'axe' });
-  defBlock(5,  { name: 'Folhas',        tex: Array(6).fill(TEX.leaves), hardness: 0.2, transparent: true, alphaTest: 0.1, opacity: 0.92, tool: 'shears',
+  defBlock(5,  { name: 'Folhas',        tex: Array(6).fill(TEX.leaves), hardness: 0.2, transparent: true, alphaTest: 0.5, tool: 'shears',
     texVariants: [
       Array(6).fill(TEX.leaves),
       Array(6).fill(TEX.leaves2),
