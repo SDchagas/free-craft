@@ -258,7 +258,7 @@
     const kind = opts.kind || (opts.tom ? 'tom' : 'rat');
     let built;
     let cfg = { hp: 6, radius: 0.25, height: 0.7, hostile: false, damage: 0,
-                sightRange: 0, attackRange: 0, speed: 1.5, despawnAtDay: false, dropId: 6, dropCount: 1 };
+                sightRange: 0, attackRange: 0, speed: 1.5, despawnAtDay: false, dropId: 119, dropCount: 1 };
     let bodyIdx = 0, tailIdx = -1;
     switch (kind) {
       case 'tom': {
@@ -282,7 +282,7 @@
         built = makeRatMesh();
         bodyIdx = built.bodyIdx; tailIdx = built.tailIdx;
         built = built.mesh;
-        cfg = { hp: 6, radius: 0.25, height: 0.7, hostile:false, damage:0, sightRange:0, attackRange:0, speed:1.5, despawnAtDay:false, dropId: 6, dropCount: 1 };
+        cfg = { hp: 6, radius: 0.25, height: 0.7, hostile:false, damage:0, sightRange:0, attackRange:0, speed:1.5, despawnAtDay:false, dropId: 119, dropCount: 1 };
     }
     const mesh = built;
     mesh.position.set(x, y, z);
@@ -518,9 +518,13 @@
       }
 
       if (n.hp <= 0) {
-        const dropId = n.dropId || 6;
+        const dropId = n.dropId || 119;     // padrão: carne crua
         const dropCount = n.dropCount || 1;
         if (Game.drops) Game.drops.spawn(n.pos.x, n.pos.y + 0.5, n.pos.z, dropId, dropCount, { gentle: true });
+        // ovelha também dropa carne além da lã
+        if (n.kind === 'sheep' && Game.drops) {
+          Game.drops.spawn(n.pos.x, n.pos.y + 0.5, n.pos.z, 119, 1, { gentle: true });
+        }
         if (Game.audio) Game.audio.play(n.kind === 'tom' || n.kind === 'spider' ? 'cat_hiss' : 'rat_squeak');
         scene.remove(n.mesh);
         list.splice(i, 1);

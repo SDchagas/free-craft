@@ -274,7 +274,10 @@
       const p = origin.clone().addScaledVector(dir, d);
       const bx = Math.floor(p.x + 0.5), by = Math.floor(p.y + 0.5), bz = Math.floor(p.z + 0.5);
       const t = Game.world.get(bx, by, bz);
-      if (t && !Game.items[t].liquid && !(Game.items[t].passable)) {
+      // ignora líquidos. Plantas/tochas (passable) podem ser miradas pra
+      // serem quebradas — não bloqueiam a passagem física, mas o raycast
+      // as detecta.
+      if (t && !Game.items[t].liquid) {
         return { block: { x: bx, y: by, z: bz }, place: prev };
       }
       prev = { x: bx, y: by, z: bz };
@@ -498,32 +501,59 @@
         return;
       }
 
+      // Tenta atacar um NPC próximo no centro da tela ANTES de iniciar mineração.
+      // Funciona mesmo sem bloco mirado (e.g. animal no campo aberto).
+      const tool = Game.inventory.getActiveTool();
+      const dir = new THREE.Vector3(0, 0, -1)
+        .applyEuler(new THREE.Euler(Game.player.pitch, Game.player.yaw, 0, 'YXZ'));
+      // origem do ataque: olho em 1ª pessoa, corpo em 3ª pessoa
+      const origin = (Game.cameraMode === 'third')
+        ? Game.player.pos.clone()
+        : camera.position.clone();
+      let hitNpc = false;
+      for (const n of Game.npcs.list) {
+        const center = n.pos.clone().add(new THREE.Vector3(0, n.height * 0.5, 0));
+        const d = center.distanceTo(origin);
+        if (d < 4) {
+          const toN = center.clone().sub(origin).normalize();
+          if (dir.dot(toN) > 0.85) {
+            // qualquer ferramenta funciona; mãos vazias dão 1 de dano
+            let dmg = 1;
+            if (tool) {
+              if (tool.toolType === 'sword') dmg = tool.damage;
+              else if (tool.toolType === 'axe') dmg = tool.damage * 0.85;
+              else if (tool.toolType === 'pick') dmg = tool.damage;
+              else if (tool.toolType === 'shovel') dmg = tool.damage * 0.7;
+              else dmg = 1;
+            }
+            Game.npcs.damage(n, dmg);
+            n.vel.y = 4;
+            n.vel.x = toN.x * 4;
+            n.vel.z = toN.z * 4;
+            hitNpc = true;
+            break;
+          }
+        }
+      }
+      if (hitNpc) {
+        placeSwingT = 1;
+        return;
+      }
+      // Sem NPC alcançado: começa a minerar bloco se estiver mirando algum
       if (!hit) return;
       mining.active = true;
       mining.bx = hit.block.x; mining.by = hit.block.y; mining.bz = hit.block.z;
       mining.progress = 0; mining.stage = -1;
-      // ataque em NPCs próximos no centro da tela
-      const tool = Game.inventory.getActiveTool();
-      const dir = new THREE.Vector3(0, 0, -1)
-        .applyEuler(new THREE.Euler(Game.player.pitch, Game.player.yaw, 0, 'YXZ'));
-      for (const n of Game.npcs.list) {
-        const d = n.pos.distanceTo(camera.position);
-        if (d < 3) {
-          const toN = n.pos.clone().sub(camera.position).normalize();
-          if (dir.dot(toN) > 0.9) {
-            const baseDmg = tool && (tool.toolType === 'sword' || tool.toolType === 'axe') ? tool.damage : 1;
-            Game.npcs.damage(n, baseDmg);
-            n.vel.y = 4;
-            n.vel.x = toN.x * 4;
-            n.vel.z = toN.z * 4;
-          }
-        }
-      }
     } else if (e.button === 2) {
       const slot = Game.inventory.data[Game.inventory.getSelectedSlot()];
 
-      // comer alimento (queijo=6, pão=123) — não precisa olhar pra bloco
-      const FOODS = { 6: { hunger: 6, sat: 3 }, 123: { hunger: 8, sat: 5 }, 119: { hunger: 3, sat: 1 }, 120: { hunger: 4, sat: 2 } };
+      // comer alimento — clique direito sem mirar bloco específico
+      // pão > peixe > carne crua (na ordem de eficiência)
+      const FOODS = {
+        123: { hunger: 8, sat: 5 },   // pão
+        120: { hunger: 4, sat: 2 },   // peixe
+        119: { hunger: 3, sat: 1 },   // carne crua
+      };
       if (slot && FOODS[slot.id] && Game.player.hunger < Game.player.maxHunger) {
         const f = FOODS[slot.id];
         Game.physics.eatHunger(f.hunger, f.sat);
@@ -774,12 +804,13 @@
       Game.inventory.data[7] = { id: 12,  count: 64 }; // tábuas
       Game.inventory.data[8] = { id: 21,  count: 64 }; // pedregulho
 
-      // Mochila: TODOS os blocos e itens principais
+      // Mochila: TODOS os blocos e itens principais (sem queijo)
       const all = [
-        [1, 64],[2, 64],[3, 64],[4, 64],[5, 64],[6, 64],[7, 64],[8, 64],
+        [1, 64],[2, 64],[3, 64],[4, 64],[5, 64],[7, 64],[8, 64],
         [9, 64],[10, 64],[11, 64],[13, 64],[14, 64],[15, 64],[16, 64],[17, 64],
         [18, 64],[19, 64],[22, 64],[23, 64],[24, 64],[25, 64],[26, 64],[27, 64],
-        [28, 64],[114, 64],[113, 32],
+        [28, 64],[29, 32],[39, 32],[124, 1],
+        [114, 64],[113, 32],[122, 32],[121, 32],[123, 16],
       ];
       for (const [id, n] of all) Game.inventory.add(id, n);
 

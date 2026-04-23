@@ -460,9 +460,7 @@
         loadChunkRender(pcx + dx, pcz + dz);
       }
     }
-    // landmarks
-    const cy = topY(0, 0);
-    set(0, cy, 0, 6);  refresh(0, cy, 0);
+    // landmark: apenas a mesa de craft no spawn
     const my = topY(2, 2);
     set(2, my, 2, 13); refresh(2, my, 2);
     // a partir daqui, mudanças no mundo são "intencionais" (player) e devem
