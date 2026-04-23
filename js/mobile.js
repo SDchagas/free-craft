@@ -22,7 +22,7 @@
   let stickActive = null; // {id, baseX, baseY, dx, dy}
   let panTouchId = null;
 
-  const STICK_RADIUS = 60;
+  const STICK_RADIUS = 80;
 
   function createUI() {
     const wrap = document.createElement('div');
@@ -47,38 +47,43 @@
         font-family: 'Bungee', sans-serif;
       }
       #mob-stick {
-        position: absolute; bottom: 90px; left: 30px;
-        width: 130px; height: 130px;
+        position: absolute; bottom: 50px; left: 30px;
+        width: 180px; height: 180px;
         border-radius: 50%;
-        background: rgba(26,26,46,0.45);
-        border: 3px solid rgba(255,255,255,0.4);
+        background: rgba(26,26,46,0.18);
+        border: 2px solid rgba(255,255,255,0.20);
         pointer-events: auto;
         touch-action: none;
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
       }
       #mob-stick-knob {
         position: absolute; top: 50%; left: 50%;
-        width: 50px; height: 50px;
+        width: 70px; height: 70px;
         border-radius: 50%;
-        background: rgba(255,71,87,0.85);
+        background: rgba(255,71,87,0.45);
+        border: 2px solid rgba(255,255,255,0.5);
         transform: translate(-50%, -50%);
         pointer-events: none;
       }
       #mob-buttons {
-        position: absolute; right: 16px; bottom: 30px;
-        display: grid; grid-template-columns: repeat(3, 60px); gap: 10px;
+        position: absolute; right: 20px; bottom: 50px;
+        display: grid; grid-template-columns: repeat(3, 70px); gap: 12px;
         pointer-events: auto;
       }
       .mob-btn {
-        width: 60px; height: 60px;
+        width: 70px; height: 70px;
         border-radius: 50%;
-        border: 3px solid #1a1a2e;
-        background: rgba(255,247,230,0.85);
-        font-size: 22px; font-weight: bold;
-        color: #1a1a2e;
+        border: 2px solid rgba(255,255,255,0.4);
+        background: rgba(26,26,46,0.30);
+        font-size: 24px; font-weight: bold;
+        color: white;
         touch-action: none;
         user-select: none;
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
       }
-      .mob-btn:active { background: #ff4757; color: white; }
+      .mob-btn:active { background: rgba(255,71,87,0.7); border-color: white; }
       #orient-lock-overlay {
         position: fixed; inset: 0;
         background: rgba(0,0,0,0.92);
@@ -153,7 +158,8 @@
     stick.addEventListener('touchstart', e => {
       e.preventDefault();
       const t = e.changedTouches[0];
-      stickActive = { id: t.identifier, baseX: stickRect().left + 65, baseY: stickRect().top + 65, dx: 0, dy: 0 };
+      const r = stickRect();
+      stickActive = { id: t.identifier, baseX: r.left + r.width/2, baseY: r.top + r.height/2, dx: 0, dy: 0 };
     }, { passive: false });
     stick.addEventListener('touchmove', e => {
       e.preventDefault();
@@ -182,34 +188,65 @@
       setKey('KeyA', false); setKey('KeyD', false);
     });
 
-    // pan da câmera no resto da tela
+    // Canvas: gerencia pan + tap/hold
+    //  tap curto (<250ms + pouco movimento) → coloca bloco
+    //  hold     (>250ms)                    → ataca/minera enquanto segurado
+    //  qualquer movimento                    → panning da câmera (sempre)
     const renderer = Game.canvas;
     if (renderer) {
       let lastX = 0, lastY = 0;
+      let startX = 0, startY = 0;
+      let startT = 0;
+      let moved = 0;
+      let holdTriggered = false;
+      let holdTimer = null;
+
       renderer.addEventListener('touchstart', e => {
+        e.preventDefault();
         if (panTouchId != null) return;
-        // ignora se toque caiu em UI
         const t = e.changedTouches[0];
         if (t.target.closest('#mobile-ui')) return;
         panTouchId = t.identifier;
-        lastX = t.clientX; lastY = t.clientY;
-      }, { passive: true });
+        lastX = startX = t.clientX;
+        lastY = startY = t.clientY;
+        startT = performance.now();
+        moved = 0;
+        holdTriggered = false;
+        clearTimeout(holdTimer);
+        holdTimer = setTimeout(() => {
+          if (panTouchId != null && moved < 18) {
+            holdTriggered = true;
+            Game.mobile._attack(true);
+          }
+        }, 250);
+      }, { passive: false });
       renderer.addEventListener('touchmove', e => {
         for (const t of e.changedTouches) {
           if (t.identifier !== panTouchId) continue;
           const dx = t.clientX - lastX;
           const dy = t.clientY - lastY;
           lastX = t.clientX; lastY = t.clientY;
+          moved += Math.abs(dx) + Math.abs(dy);
           Game.player.yaw -= dx * 0.005;
           Game.player.pitch -= dy * 0.005;
           Game.player.pitch = Math.max(-Math.PI/2 + 0.01, Math.min(Math.PI/2 - 0.01, Game.player.pitch));
         }
-      }, { passive: true });
+      }, { passive: false });
       renderer.addEventListener('touchend', e => {
         for (const t of e.changedTouches) {
-          if (t.identifier === panTouchId) panTouchId = null;
+          if (t.identifier !== panTouchId) continue;
+          panTouchId = null;
+          clearTimeout(holdTimer);
+          const dt = performance.now() - startT;
+          if (holdTriggered) {
+            Game.mobile._attack(false);  // solta o minerar
+          } else if (dt < 250 && moved < 18) {
+            // tap curto → coloca bloco
+            Game.mobile._place();
+          }
+          moved = 0;
         }
-      });
+      }, { passive: false });
     }
 
     // botões
@@ -245,5 +282,6 @@
     usesTouch: false,
     _attack: () => {},   // será sobrescrito por main.js
     _place:  () => {},
+    requestFullscreenAndLandscape,
   };
 })();

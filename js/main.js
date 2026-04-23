@@ -377,7 +377,8 @@
     Game.player.pos.set(0, 14, 6);
     Game.player.vel.set(0, 0, 0);
     if (Game.mobile && Game.mobile.isTouch) {
-      // mobile: sem pointer lock; só esconde tela inicial
+      // mobile: entra em fullscreen + lock landscape (precisa do gesto do click)
+      try { Game.mobile.requestFullscreenAndLandscape(); } catch (e) {}
       startScreen.style.display = 'none';
       locked = true;
     } else {
