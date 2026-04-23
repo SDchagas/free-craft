@@ -65,6 +65,7 @@
   Game.fences.bindScene(scene);
   Game.beds.bindScene(scene);
   Game.plants.bindScene(scene);
+  if (Game.tnt) Game.tnt.bindScene(scene);
   if (Game.multiplayer) Game.multiplayer.bindScene(scene);
   Game.world.generate();
   Game.water.initializeFromWorld();
@@ -262,14 +263,20 @@
   function raycast() {
     const dir = new THREE.Vector3(0, 0, -1)
       .applyEuler(new THREE.Euler(Game.player.pitch, Game.player.yaw, 0, 'YXZ'));
-    const origin = camera.position.clone();
+    // Em 3ª pessoa o raycast SEMPRE parte do player (não da câmera atrás dele)
+    // pra que o alcance seja igual ao da 1ª pessoa
+    const origin = (Game.cameraMode === 'third')
+      ? Game.player.pos.clone()
+      : camera.position.clone();
     const step = 0.05, maxDist = 6;
     let prev = { x: Math.floor(origin.x + 0.5), y: Math.floor(origin.y + 0.5), z: Math.floor(origin.z + 0.5) };
     for (let d = 0; d < maxDist; d += step) {
       const p = origin.clone().addScaledVector(dir, d);
       const bx = Math.floor(p.x + 0.5), by = Math.floor(p.y + 0.5), bz = Math.floor(p.z + 0.5);
       const t = Game.world.get(bx, by, bz);
-      if (t && !Game.items[t].liquid) return { block: { x: bx, y: by, z: bz }, place: prev };
+      if (t && !Game.items[t].liquid && !(Game.items[t].passable)) {
+        return { block: { x: bx, y: by, z: bz }, place: prev };
+      }
       prev = { x: bx, y: by, z: bz };
     }
     return null;
@@ -550,6 +557,13 @@
       // cama → dormir
       if (targetType === 33) {
         Game.beds.trySleep(hit.block.x, hit.block.y, hit.block.z);
+        placeSwingT = 1;
+        return;
+      }
+      // pederneira em TNT → acende
+      if (slot && slot.id === 124 && targetType === 39 && Game.tnt) {
+        Game.tnt.ignite(hit.block.x, hit.block.y, hit.block.z);
+        if (Game.audio) Game.audio.play('fizz');
         placeSwingT = 1;
         return;
       }
@@ -891,6 +905,7 @@
     if (Game.playermesh) Game.playermesh.update(dt);
 
     if (locked) updateMining(dt);
+    Game.mining_active = mining.active;  // expõe pra playermesh animar braço
     animateHand(dt, moving);
     updateParticles(dt);
     Game.npcs.update(dt);
@@ -906,6 +921,7 @@
     Game.beds.update(dt);
     Game.plants.update(dt);
     Game.world.spreadUpdate(dt);
+    if (Game.tnt) Game.tnt.update(dt);
     if (Game.multiplayer) Game.multiplayer.update(dt);
     weaponCd = Math.max(0, weaponCd - dt);
 

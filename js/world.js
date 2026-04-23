@@ -123,6 +123,13 @@
     if (t === 35) return;  // muda
     if (t === 36) return;  // trigo
     if (t === 37) return;  // grama alta
+    // água com fluxo (level < SOURCE) usa mesh fino (water.js)
+    if (t === 7 && Game.water && Game.water.getLevel(x, y, z) < Game.water.SOURCE_LEVEL) {
+      // ainda assim apaga mesh velho se existir
+      const m = meshes.get(key);
+      if (m) { if (m.parent) m.parent.remove(m); meshes.delete(key); }
+      return;
+    }
     if (meshes.has(key)) return;
     const m = new THREE.Mesh(geometry, getMaterials(t, x, y, z));
     m.position.set(x, y, z);

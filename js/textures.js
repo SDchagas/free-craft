@@ -438,6 +438,55 @@
     }
   });
 
+  // ---------- TNT ----------
+  TEX.tntSide = makeTex((ctx, s) => {
+    // base vermelha + faixa branca com letras "TNT"
+    ctx.fillStyle = '#cc1a1a'; ctx.fillRect(0, 0, s, s);
+    // ruído da camada
+    const rng = mulberry32(40001);
+    for (let i = 0; i < 50; i++) {
+      ctx.fillStyle = rng() < 0.5 ? '#aa0a0a' : '#dd2a2a';
+      ctx.fillRect(Math.floor(rng() * s), Math.floor(rng() * s), 1, 1);
+    }
+    // listras horizontais (papel)
+    ctx.fillStyle = '#ffe070';
+    ctx.fillRect(0, 4, s, 1);
+    ctx.fillRect(0, s - 5, s, 1);
+    // faixa branca central
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 6, s, 5);
+    // letras "TNT" simples (3 letras pretas em pixels)
+    ctx.fillStyle = '#000';
+    // T
+    ctx.fillRect(2, 7, 3, 1); ctx.fillRect(3, 8, 1, 2);
+    // N
+    ctx.fillRect(6, 7, 1, 3); ctx.fillRect(8, 7, 1, 3); ctx.fillRect(7, 8, 1, 1);
+    // T
+    ctx.fillRect(10, 7, 3, 1); ctx.fillRect(11, 8, 1, 2);
+  });
+  TEX.tntTop = makeTex((ctx, s) => {
+    // pavio no centro
+    ctx.fillStyle = '#cc1a1a'; ctx.fillRect(0, 0, s, s);
+    const rng = mulberry32(40002);
+    for (let i = 0; i < 40; i++) {
+      ctx.fillStyle = rng() < 0.5 ? '#aa0a0a' : '#dd2a2a';
+      ctx.fillRect(Math.floor(rng() * s), Math.floor(rng() * s), 1, 1);
+    }
+    // pavio cinza no centro
+    ctx.fillStyle = '#888';
+    ctx.fillRect(s/2 - 1, s/2 - 1, 2, 2);
+    ctx.fillStyle = '#ffd700';
+    ctx.fillRect(s/2, s/2, 1, 1);
+  });
+  TEX.tntBottom = makeTex((ctx, s) => {
+    ctx.fillStyle = '#aa0a0a'; ctx.fillRect(0, 0, s, s);
+    const rng = mulberry32(40003);
+    for (let i = 0; i < 30; i++) {
+      ctx.fillStyle = '#7a0505';
+      ctx.fillRect(Math.floor(rng() * s), Math.floor(rng() * s), 1, 1);
+    }
+  });
+
   // ---------- Plantas (cross-section, com fundo transparente) ----------
   TEX.sapling = makeTex((ctx, s) => {
     ctx.clearRect(0, 0, s, s);
@@ -895,6 +944,31 @@
     });
   }
 
+  function makeFlintIcon() {
+    return makeTex((ctx, s) => {
+      ctx.clearRect(0, 0, s, s);
+      // pederneira (forma de "X" com cabo de madeira + lasca de pedra)
+      // cabo de madeira
+      ctx.fillStyle = '#8b5a2b';
+      ctx.fillRect(8, 5, 4, 8);
+      ctx.fillStyle = '#5a3818';
+      ctx.fillRect(8, 11, 4, 1);
+      // metal (ferro)
+      ctx.fillStyle = '#b0b0b0';
+      ctx.fillRect(2, 4, 6, 2);
+      ctx.fillStyle = '#888';
+      ctx.fillRect(2, 6, 6, 1);
+      // pedra (lasca)
+      ctx.fillStyle = '#3a3a3a';
+      ctx.fillRect(2, 10, 4, 3);
+      ctx.fillRect(3, 13, 2, 1);
+      // faísca (canto superior)
+      ctx.fillStyle = '#ffd700';
+      ctx.fillRect(13, 2, 2, 2);
+      ctx.fillRect(14, 1, 1, 1);
+    });
+  }
+
   function makeBulletIcon() {
     return makeTex((ctx, s) => {
       ctx.clearRect(0, 0, s, s);
@@ -924,6 +998,6 @@
     makeFlatIcon, makeStickIcon, makePickaxeIcon, makeSwordIcon,
     makeShovelIcon, makeAxeIcon, makeBowIcon, makePistolIcon,
     makeShieldIcon, makeHelmetIcon, makeChestIcon, makeLegsIcon,
-    makeBootsIcon, makeArrowIcon, makeBulletIcon,
+    makeBootsIcon, makeArrowIcon, makeBulletIcon, makeFlintIcon,
   };
 })();

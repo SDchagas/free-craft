@@ -41,25 +41,80 @@
   function setWater(x, y, z, level, source) {
     const key = K(x, y, z);
     const cur = data.get(key);
-    if (cur && cur.level === level && cur.source === source &&
-        Game.world.get(x, y, z) === WATER_ID) return;
+    const wasSet = cur && cur.level === level && cur.source === source &&
+                   Game.world.get(x, y, z) === WATER_ID;
     data.set(key, { level, source: !!source });
     if (Game.world.get(x, y, z) !== WATER_ID) {
       Game.world.set(x, y, z, WATER_ID);
       Game.world.refresh(x, y, z);
     }
-    scheduleAt(x, y, z);
-    scheduleNeighbors(x, y, z);
+    // atualiza/recria o mesh fino se level < SOURCE
+    refreshFlowMesh(x, y, z, level);
+    if (!wasSet) {
+      scheduleAt(x, y, z);
+      scheduleNeighbors(x, y, z);
+    }
   }
 
   function clearWater(x, y, z) {
     const key = K(x, y, z);
     data.delete(key);
+    removeFlowMesh(x, y, z);
     if (Game.world.get(x, y, z) === WATER_ID) {
       Game.world.set(x, y, z, 0);
       Game.world.refresh(x, y, z);
     }
     scheduleNeighbors(x, y, z);
+  }
+
+  // ---------- Visual: altura proporcional ao level ----------
+  // Nível 8 (source/falling) usa o cubo padrão renderizado pelo world.
+  // Nível 1-7 usa mesh customizado fino (lâmina) na base do bloco.
+  const flowMeshes = new Map();   // "x,y,z" -> THREE.Mesh
+  let flowMat = null;
+  function getFlowMaterial() {
+    if (flowMat) return flowMat;
+    flowMat = new THREE.MeshLambertMaterial({
+      map: Game.tex && Game.tex.water ? Game.tex.water : null,
+      transparent: true, opacity: 0.7, depthWrite: false,
+    });
+    return flowMat;
+  }
+
+  function refreshFlowMesh(x, y, z, level) {
+    const key = K(x, y, z);
+    // se source/queda → remove mesh fino, deixa o cubo padrão
+    if (level >= SOURCE_LEVEL) {
+      removeFlowMesh(x, y, z);
+      return;
+    }
+    // mesh fino: altura = level/8 do bloco
+    const h = Math.max(0.12, level / 8);
+    const yOffset = -0.5 + h / 2;  // base no fundo do bloco
+    let m = flowMeshes.get(key);
+    if (m) {
+      // ajusta scale + posição
+      m.scale.y = h;
+      m.position.y = y + yOffset;
+    } else {
+      const geo = new THREE.BoxGeometry(0.96, 1.0, 0.96);  // y=1 base, escala depois
+      m = new THREE.Mesh(geo, getFlowMaterial());
+      m.position.set(x, y + yOffset, z);
+      m.scale.y = h;
+      m.renderOrder = 2;
+      const scene = Game.scene;
+      if (scene) scene.add(m);
+      flowMeshes.set(key, m);
+    }
+  }
+
+  function removeFlowMesh(x, y, z) {
+    const key = K(x, y, z);
+    const m = flowMeshes.get(key);
+    if (m) {
+      if (m.parent) m.parent.remove(m);
+      flowMeshes.delete(key);
+    }
   }
 
   function placeSource(x, y, z) {

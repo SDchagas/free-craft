@@ -69,6 +69,7 @@
   defBlock(36, { name: 'Trigo',         tex: Array(6).fill(TEX.wheatGrown), hardness: 0.05, transparent: true, alphaTest: 0.5, passable: true });
   defBlock(37, { name: 'Grama Alta',    tex: Array(6).fill(TEX.tallGrass), hardness: 0.0, transparent: true, alphaTest: 0.5, passable: true });
   defBlock(38, { name: 'Terra Cultivada',tex: Array(6).fill(TEX.farmland), hardness: 0.55, tool: 'shovel' });
+  defBlock(39, { name: 'TNT',           tex: [TEX.tntSide, TEX.tntSide, TEX.tntTop, TEX.tntBottom, TEX.tntSide, TEX.tntSide], hardness: 0.5 });
 
   // ---------- Itens ----------
   defItem(101, { name: 'Carvão',      icon: I.makeFlatIcon('#1a1a2e', '#444') });
@@ -89,6 +90,7 @@
   defItem(121, { name: 'Semente',     icon: I.makeFlatIcon('#9ac06b', '#506a35'), maxStack: 64 });
   defItem(122, { name: 'Trigo',       icon: I.makeFlatIcon('#d8b450', '#7a5a20'), maxStack: 64 });
   defItem(123, { name: 'Pão',         icon: I.makeFlatIcon('#c98856', '#7a4a18'), maxStack: 16 });
+  defItem(124, { name: 'Pederneira',  icon: I.makeFlintIcon(), maxStack: 1 });
   defItem(111, { name: 'Topázio',     icon: I.makeFlatIcon('#ff9933', '#cc6622') });
   defItem(113, { name: 'Bala',        icon: I.makeBulletIcon(), maxStack: 32 });
   defItem(114, { name: 'Flecha',      icon: I.makeArrowIcon(),  maxStack: 64 });
@@ -211,6 +213,13 @@
     { shape: ['WW','WW'], key: { W: 116 }, result: { id: 34, count: 1 } },
     // Pão: 3 trigos em linha horizontal
     { shape: ['WWW'], key: { W: 122 }, result: { id: 123, count: 1 } },
+    // TNT: 4 areia em volta + carvão no centro (alternando)
+    //   S C S
+    //   C S C
+    //   S C S
+    { shape: ['SCS','CSC','SCS'], key: { S: 11, C: 101 }, result: { id: 39, count: 1 } },
+    // Pederneira: 1 ferro + 1 redstone (em diagonal)
+    { shape: ['I ',' R'], key: { I: 102, R: 106 }, result: { id: 124, count: 1 } },
   ];
 
   Game.items = ITEMS;

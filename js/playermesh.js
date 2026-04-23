@@ -8,6 +8,8 @@
 
   let group = null;
   let parts = {};
+  let toolGroup = null;       // sub-group dentro da mão direita pro item segurado
+  let currentItemId = null;
 
   function build() {
     const c = Game.skin.all();
@@ -40,6 +42,12 @@
     const handGeo = new THREE.BoxGeometry(0.22, 0.10, 0.22);
     const handL = new THREE.Mesh(handGeo, skin); handL.position.set(-0.40, 0.78, 0); g.add(handL);
     const handR = new THREE.Mesh(handGeo, skin); handR.position.set( 0.40, 0.78, 0); g.add(handR);
+    // group pra ferramenta/bloco segurado — anexado à mão direita,
+    // levemente à frente pra não enfiar dentro da pele
+    const tGroup = new THREE.Group();
+    tGroup.position.set(0.40, 0.55, 0.15);
+    tGroup.rotation.set(-0.3, 0, 0);
+    g.add(tGroup);
     // cabeça
     const head = new THREE.Mesh(new THREE.BoxGeometry(0.50, 0.50, 0.50), skin);
     head.position.y = 1.80;
@@ -93,7 +101,34 @@
       if (hatMesh) g.add(hatMesh);
     }
 
-    return { g, parts: { legL, legR, armL, armR, head } };
+    return { g, parts: { legL, legR, armL, armR, head, handR, tGroup } };
+  }
+
+  // (re)constrói a mesh do item segurado dentro da mão direita.
+  function setTool(itemId) {
+    if (!toolGroup) return;
+    if (currentItemId === itemId) return;
+    currentItemId = itemId;
+    while (toolGroup.children.length) toolGroup.remove(toolGroup.children[0]);
+    if (!itemId || !Game.viewmodel) return;
+    // reaproveita os mesmos builders do viewmodel
+    const def = Game.items[itemId];
+    if (!def) return;
+    let mesh = null;
+    try {
+      // o viewmodel expõe makers internos via build through a hack: vamos
+      // criar uma versão simplificada usando getMaterials pra blocos
+      if (def.kind === 'block') {
+        const mats = Game.world.getMaterials(itemId);
+        mesh = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.30, 0.30), mats);
+      } else if (def.icon) {
+        mesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.34, 0.34),
+          new THREE.MeshBasicMaterial({ map: def.icon, transparent: true, alphaTest: 0.1, side: THREE.DoubleSide })
+        );
+      }
+    } catch (e) {}
+    if (mesh) toolGroup.add(mesh);
   }
 
   function init(scene) {
@@ -107,39 +142,55 @@
     const built = build();
     group = built.g;
     parts = built.parts;
+    toolGroup = parts.tGroup;
+    currentItemId = null;       // força reconstrução do tool no próximo update
     scene.add(group);
-    setVisible(false);  // começa invisível (1ª pessoa por padrão)
+    setVisible(false);          // começa invisível (1ª pessoa por padrão)
   }
 
   function setVisible(v) { if (group) group.visible = v; }
   function isVisible() { return group ? group.visible : false; }
 
+  let mineSwingT = 0;
+
   function update(dt) {
     if (!group || !Game.player) return;
+    // sincroniza ferramenta segurada com slot ativo
+    setTool(Game.inventory ? Game.inventory.getActiveId() : 0);
+
     // posição: baseada nos pés do player (player.pos é olho; pés = pos.y - height)
     const px = Game.player.pos.x;
     const py = Game.player.pos.y - Game.player.height;
     const pz = Game.player.pos.z;
     group.position.set(px, py, pz);
-    // gira corpo seguindo yaw do player
-    group.rotation.y = Game.player.yaw + Math.PI;  // +π pq player.yaw=0 olha pra -Z
+    group.rotation.y = Game.player.yaw + Math.PI;
 
-    // anima andar (oscila pernas/braços) se o jogador está se mexendo no chão
-    const walking = Game.player.onGround && (Game.input && Game.input.keys && (Game.input.keys.KeyW || Game.input.keys.KeyS || Game.input.keys.KeyA || Game.input.keys.KeyD));
+    // anima andar (oscila pernas/braços)
+    const walking = Game.player.onGround && (Game.input && Game.input.keys &&
+      (Game.input.keys.KeyW || Game.input.keys.KeyS || Game.input.keys.KeyA || Game.input.keys.KeyD));
     const t = performance.now() * 0.008;
     if (walking) {
       const a = Math.sin(t) * 0.6;
       if (parts.legL) parts.legL.rotation.x =  a;
       if (parts.legR) parts.legR.rotation.x = -a;
       if (parts.armL) parts.armL.rotation.x = -a;
-      if (parts.armR) parts.armR.rotation.x =  a;
+      if (parts.armR && !Game.mining_active) parts.armR.rotation.x = a;
     } else {
-      // suaviza retorno
-      for (const k of ['legL','legR','armL','armR']) {
+      for (const k of ['legL','legR','armL']) {
         if (parts[k]) parts[k].rotation.x *= 0.85;
       }
     }
+
+    // animação do braço direito ao minerar/atacar — sobreescreve walking
+    if (Game.mining_active) {
+      mineSwingT += dt * 12;
+      const swing = Math.sin(mineSwingT);
+      if (parts.armR) parts.armR.rotation.x = -1.2 + swing * 0.6;
+    } else {
+      mineSwingT = 0;
+      if (parts.armR && !walking) parts.armR.rotation.x *= 0.85;
+    }
   }
 
-  Game.playermesh = { init, refreshSkin, setVisible, isVisible, update };
+  Game.playermesh = { init, refreshSkin, setVisible, isVisible, update, setTool };
 })();
