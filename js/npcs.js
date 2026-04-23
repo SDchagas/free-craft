@@ -670,29 +670,36 @@
     return spawnAtSurface(x, z, { kind });
   }
 
-  // Popular um chunk recém-gerado com 0-3 passivos.
-  // Chamada no fim de world.generateChunkData → mobs ficam distribuídos
-  // pelo mapa em qualquer direção que o jogador caminhe.
+  // Popula chunk com 0-3 passivos. Cada chunk é populado UMA VEZ por
+  // sessão (Set abaixo). Chamada no LOAD do chunk no render (não na
+  // geração) — assim o mob só aparece quando o player está perto.
+  const populatedChunks = new Set();
   function populateChunk(cx, cz, CHUNK) {
     if (!scene) return;
-    if (Game.player.mode === 'creative') return;  // sem mobs no creative
-    if (passiveCount() >= 24) return;             // teto global
+    if (Game.player.mode === 'creative') return;
+    const key = `${cx},${cz}`;
+    if (populatedChunks.has(key)) return;     // já populado nesta sessão de render
+    if (passiveCount() >= 30) return;         // teto generoso (despawnFar reduz)
+    populatedChunks.add(key);
     const seed = ((cx * 73856093) ^ (cz * 19349663)) >>> 0;
     let s = seed;
     const rng = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
-    const count = Math.floor(rng() * 4);  // 0, 1, 2 ou 3
+    const count = Math.floor(rng() * 4);
     for (let i = 0; i < count; i++) {
       const lx = Math.floor(rng() * CHUNK);
       const lz = Math.floor(rng() * CHUNK);
       const x = cx * CHUNK + lx, z = cz * CHUNK + lz;
       const top = Game.world.topY(x, z);
       if (top <= 0) continue;
-      // só spawna em grama
       if (Game.world.get(x, top - 1, z) !== 1) continue;
       const kinds = ['cow','cow','pig','sheep','sheep','horse','rat','rat'];
       const kind = kinds[Math.floor(rng() * kinds.length)];
       spawn(x + 0.5, top - 0.5, z + 0.5, { kind });
     }
+  }
+  function clearPopulated() { populatedChunks.clear(); }
+  function unpopulateChunk(cx, cz) {
+    populatedChunks.delete(`${cx},${cz}`);
   }
 
   // Despawna mobs muito longe do player pra controlar a quantidade total.
@@ -713,7 +720,7 @@
   Game.npcs = {
     list, bindScene, spawn, spawnAtSurface, spawnInitial,
     spawnTomNearby, spawnHostileNearby, spawnBird, spawnFish, spawnGolemAt,
-    spawnPassiveNearby, despawnFar, populateChunk,
+    spawnPassiveNearby, despawnFar, populateChunk, clearPopulated, unpopulateChunk,
     update, damage, tomCount, hostileCount, passiveCount,
   };
 })();

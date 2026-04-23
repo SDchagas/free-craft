@@ -253,10 +253,7 @@
       }
     }
 
-    // popula o chunk com 0-3 mobs passivos (cada chunk tem fauna própria)
-    if (Game.npcs && Game.npcs.populateChunk) {
-      Game.npcs.populateChunk(cx, cz, CHUNK);
-    }
+    // (populate de mobs roda em loadChunkRender — quando o player chega perto)
   }
 
   // Variantes de árvore — alturas, tamanhos e formatos de copa diferentes
@@ -361,6 +358,8 @@
     if (Game.beds)    Game.beds.loadChunk(cx, cz, CHUNK);
     if (Game.plants)  Game.plants.loadChunk(cx, cz, CHUNK);
     if (Game.water && Game.water.loadChunk) Game.water.loadChunk(cx, cz, CHUNK);
+    // popula com mobs ao chegar perto (cada chunk só na primeira vez)
+    if (Game.npcs && Game.npcs.populateChunk) Game.npcs.populateChunk(cx, cz, CHUNK);
   }
 
   // Descarrega meshes do chunk (preserva DATA).
@@ -388,6 +387,8 @@
     if (Game.beds)    Game.beds.unloadChunk(cx, cz, CHUNK);
     if (Game.plants)  Game.plants.unloadChunk(cx, cz, CHUNK);
     if (Game.water && Game.water.unloadChunk) Game.water.unloadChunk(cx, cz, CHUNK);
+    // permite re-popular o chunk com mobs novos quando o player voltar
+    if (Game.npcs && Game.npcs.unpopulateChunk) Game.npcs.unpopulateChunk(cx, cz);
   }
 
   // Decide se chunk deve estar renderizado dada posição+olhar do player.
