@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Free-Craft — Voxel Sandbox grátis</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Bungee&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --accent: #ff4757;
+    --accent-dark: #c0392b;
+    --cream: #fff7e6;
+    --dark: #1a1a2e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Fredoka', sans-serif;
+    background: #87CEEB;
+    overflow: hidden;
+    user-select: none;
+  }
+  canvas { display: block; }
+
+  #start-screen {
+    position: fixed; inset: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, #ffb347 0%, #ff6b6b 40%, #2d1b4e 100%);
+  }
+  .start-card {
+    background: var(--cream);
+    border: 5px solid var(--dark);
+    border-radius: 26px;
+    padding: 28px 36px;
+    text-align: center;
+    box-shadow: 10px 10px 0 var(--dark);
+    max-width: 540px;
+  }
+  .start-card h1 {
+    font-family: 'Bungee', sans-serif;
+    font-size: 38px;
+    color: var(--dark);
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    transform: rotate(-2deg);
+  }
+  .start-card h1 span { color: var(--accent); }
+  .start-card p { color: #555; font-size: 14px; margin-bottom: 14px; line-height: 1.4; }
+  .controls-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+    background: #fff; border: 2px solid var(--dark);
+    padding: 10px; border-radius: 12px;
+    font-size: 12px; margin-bottom: 14px;
+    text-align: left;
+  }
+  .controls-grid b { color: var(--accent-dark); font-family: 'Bungee', sans-serif; font-size: 10px; }
+  .play-btn {
+    background: var(--accent); color: white;
+    font-family: 'Bungee', sans-serif; font-size: 20px;
+    border: 4px solid var(--dark); border-radius: 50px;
+    padding: 12px 36px; cursor: pointer;
+    box-shadow: 5px 5px 0 var(--dark);
+    transition: transform 0.1s, box-shadow 0.1s;
+    letter-spacing: 1px;
+  }
+  .play-btn:hover { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 var(--dark); }
+  .play-btn:active { transform: translate(3px, 3px); box-shadow: 2px 2px 0 var(--dark); }
+
+  #crosshair {
+    position: fixed; top: 50%; left: 50%;
+    width: 20px; height: 20px;
+    transform: translate(-50%, -50%);
+    pointer-events: none; z-index: 10;
+  }
+  #crosshair::before, #crosshair::after {
+    content: ""; position: absolute; background: white;
+    mix-blend-mode: difference;
+  }
+  #crosshair::before { left: 9px; top: 0; width: 2px; height: 20px; }
+  #crosshair::after { top: 9px; left: 0; height: 2px; width: 20px; }
+
+  #top-hud {
+    position: fixed; top: 12px; left: 12px; z-index: 10;
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .avatar {
+    width: 60px; height: 60px;
+    background: var(--cream);
+    border: 3px solid var(--dark);
+    border-radius: 14px;
+    box-shadow: 3px 3px 0 var(--dark);
+    padding: 4px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .info-box {
+    background: rgba(255, 247, 230, 0.95);
+    border: 3px solid var(--dark);
+    border-radius: 12px;
+    padding: 6px 12px;
+    box-shadow: 3px 3px 0 var(--dark);
+    font-size: 12px;
+    color: var(--dark);
+    font-weight: 600;
+  }
+  .info-box b { color: var(--accent-dark); font-family: 'Bungee', sans-serif; font-size: 13px; display: block; letter-spacing: 1px; }
+  .info-box .sub { font-size: 10px; color: #777; font-weight: 500; display: block; margin-top: 2px; }
+
+  #right-hud {
+    position: fixed; top: 12px; right: 12px; z-index: 10;
+    display: flex; flex-direction: column; gap: 8px; align-items: flex-end;
+  }
+  #fireball-hud {
+    background: linear-gradient(135deg, #ff9500, #ff4500);
+    border: 3px solid var(--dark);
+    border-radius: 12px;
+    padding: 6px 12px;
+    box-shadow: 3px 3px 0 var(--dark);
+    color: white;
+    font-family: 'Bungee', sans-serif;
+    font-size: 13px;
+    letter-spacing: 1px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  #fireball-hud .fb-icon { font-size: 18px; }
+  #fireball-hud.cooling { opacity: 0.5; }
+  #clock-hud {
+    background: rgba(26, 26, 46, 0.92);
+    border: 3px solid var(--dark);
+    border-radius: 12px;
+    padding: 6px 14px;
+    box-shadow: 3px 3px 0 var(--dark);
+    color: #fff7e6;
+    font-family: 'Bungee', sans-serif;
+    font-size: 16px;
+    letter-spacing: 1px;
+    text-align: center;
+    min-width: 110px;
+  }
+  #clock-hud .phase {
+    display: block;
+    font-family: 'Fredoka', sans-serif;
+    font-size: 10px;
+    color: #ffd700;
+    font-weight: 600;
+  }
+
+  #stats-hud {
+    position: fixed; bottom: 80px; left: 50%;
+    transform: translateX(-50%);
+    display: flex; flex-direction: column; gap: 4px;
+    z-index: 10; pointer-events: none;
+  }
+  .stat-bar {
+    display: flex; gap: 2px; padding: 2px 6px;
+    background: rgba(26, 26, 46, 0.7);
+    border-radius: 8px;
+  }
+  .stat-icon {
+    width: 16px; height: 16px;
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .stat-icon.full   { filter: brightness(1.0); }
+  .stat-icon.half   { filter: brightness(0.7) saturate(0.7); }
+  .stat-icon.empty  { filter: grayscale(1) brightness(0.4); }
+
+  #hotbar {
+    position: fixed; bottom: 16px; left: 50%;
+    transform: translateX(-50%);
+    display: flex; gap: 4px;
+    background: rgba(26, 26, 46, 0.85);
+    border: 3px solid var(--dark);
+    border-radius: 14px;
+    padding: 5px;
+    box-shadow: 4px 4px 0 rgba(0,0,0,0.4);
+    z-index: 10;
+  }
+  .slot {
+    width: 52px; height: 52px;
+    background: #2a2a3e;
+    border: 2px solid #555;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    transition: transform 0.1s;
+  }
+  .slot-img {
+    width: 32px; height: 32px;
+    border-radius: 4px;
+    box-shadow: inset -2px -2px 0 rgba(0,0,0,0.3), inset 2px 2px 0 rgba(255,255,255,0.2);
+    background-size: cover;
+    image-rendering: pixelated;
+  }
+  .slot-num {
+    position: absolute; top: 1px; left: 3px;
+    font-size: 9px; color: rgba(255,255,255,0.6);
+    font-weight: 700;
+  }
+  .slot-count {
+    position: absolute; bottom: 0px; right: 3px;
+    font-size: 12px; color: white; font-weight: 700;
+    text-shadow: 1px 1px 0 black;
+  }
+  .slot.active {
+    border-color: var(--accent);
+    background: rgba(255, 71, 87, 0.25);
+    transform: translateY(-3px) scale(1.06);
+    box-shadow: 0 0 16px rgba(255, 71, 87, 0.6);
+  }
+
+  #inventory-modal {
+    position: fixed; inset: 0; z-index: 50;
+    display: none;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.55);
+  }
+  #inventory-modal.show { display: flex; }
+  .inv-card {
+    background: var(--cream);
+    border: 4px solid var(--dark);
+    border-radius: 18px;
+    padding: 16px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: 8px 8px 0 var(--dark);
+  }
+  .inv-card h2 {
+    font-family: 'Bungee', sans-serif;
+    font-size: 17px;
+    color: var(--dark);
+    text-align: center;
+    letter-spacing: 1px;
+  }
+  .grid-row {
+    display: grid;
+    grid-template-columns: repeat(9, 44px);
+    gap: 3px;
+    justify-content: center;
+  }
+  .hotbar-row {
+    margin-top: 4px;
+    border-top: 2px dashed var(--dark);
+    padding-top: 8px;
+  }
+  .inv-slot {
+    width: 44px; height: 44px;
+    background: #2a2a3e;
+    border: 2px solid #555;
+    border-radius: 6px;
+    position: relative;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.1s, border-color 0.1s;
+  }
+  .inv-slot:hover { border-color: var(--accent); transform: scale(1.05); }
+  .inv-slot.selected { border-color: #ffd700; background: rgba(255, 215, 0, 0.15); box-shadow: 0 0 8px rgba(255,215,0,0.6); }
+  .inv-slot .item-img {
+    width: 30px; height: 30px;
+    background-size: cover;
+    image-rendering: pixelated;
+    border-radius: 3px;
+    pointer-events: none;
+  }
+  .inv-slot .item-count {
+    position: absolute; bottom: 0px; right: 3px;
+    font-size: 11px; color: white; font-weight: 700;
+    text-shadow: 1px 1px 0 black;
+    pointer-events: none;
+  }
+  .craft-section {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(255, 71, 87, 0.08);
+    padding: 12px;
+    border-radius: 12px;
+    border: 2px solid var(--dark);
+    justify-content: center;
+  }
+  .craft-grid { display: grid; gap: 3px; }
+  .craft-grid.size-2 { grid-template-columns: repeat(2, 44px); }
+  .craft-grid.size-3 { grid-template-columns: repeat(3, 44px); }
+  .craft-arrow {
+    font-family: 'Bungee', sans-serif;
+    font-size: 26px; color: var(--dark);
+    margin: 0 6px;
+  }
+  .craft-result {
+    background: #2a2a3e;
+    border: 3px solid var(--accent);
+    border-radius: 8px;
+    width: 56px; height: 56px;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+  .craft-result.ready { cursor: pointer; opacity: 1; box-shadow: 0 0 14px rgba(255, 71, 87, 0.6); }
+  .craft-result .item-img {
+    width: 40px; height: 40px;
+    background-size: cover;
+    image-rendering: pixelated;
+  }
+  .craft-result .item-count {
+    position: absolute; bottom: 1px; right: 3px;
+    font-size: 13px; color: white; font-weight: 700;
+    text-shadow: 1px 1px 0 black;
+  }
+  .inv-hint {
+    text-align: center; font-size: 11px; color: #666;
+    font-style: italic;
+  }
+  .inv-section-title {
+    font-family: 'Bungee', sans-serif;
+    font-size: 11px; color: var(--accent-dark);
+    text-align: center; letter-spacing: 1px;
+  }
+  #tooltip {
+    position: fixed;
+    background: rgba(0,0,0,0.88);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    pointer-events: none;
+    z-index: 200;
+    display: none;
+    font-weight: 600;
+  }
+  /* Armor slots */
+  .armor-row {
+    display: flex; gap: 16px; align-items: flex-end; justify-content: center;
+    background: rgba(0,0,0,0.05); padding: 10px;
+    border-radius: 12px; border: 2px solid var(--dark);
+  }
+  .armor-section { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .armor-slots-grid { display: flex; gap: 4px; }
+  .armor-slot-wrap { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .armor-icon { font-size: 14px; color: #999; }
+  .inv-slot.armor-slot { width: 40px; height: 40px; border-radius: 6px; }
+  .inv-slot.empty-armor { background: #1f1f2e; border-color: #333; }
+  .inv-slot.empty-armor:hover { border-color: #ffd700; }
+  .play-btn.small {
+    font-size: 12px; padding: 6px 14px; box-shadow: 3px 3px 0 var(--dark);
+    margin-left: 8px;
+  }
+  .play-btn.small:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--dark); }
+  .play-btn.small:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--dark); }
+
+  /* Recipes book */
+  #recipes-modal {
+    position: fixed; inset: 0; z-index: 60;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.6);
+  }
+  #recipes-modal.show { display: flex; }
+  .recipes-card {
+    background: var(--cream); border: 4px solid var(--dark);
+    border-radius: 18px; padding: 16px 22px;
+    box-shadow: 8px 8px 0 var(--dark);
+    width: min(720px, 92vw); max-height: 80vh;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .recipes-header {
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 2px dashed var(--dark); padding-bottom: 8px;
+  }
+  .recipes-header h2 {
+    font-family: 'Bungee', sans-serif; font-size: 20px;
+    color: var(--dark); letter-spacing: 1px;
+  }
+  .recipes-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+    overflow-y: auto; padding-right: 4px;
+  }
+  .recipes-grid::-webkit-scrollbar { width: 8px; }
+  .recipes-grid::-webkit-scrollbar-thumb { background: var(--dark); border-radius: 4px; }
+  .recipe-card {
+    display: flex; align-items: center; gap: 8px;
+    background: #fff; border: 2px solid var(--dark);
+    border-radius: 10px; padding: 8px;
+    position: relative;
+  }
+  .recipe-mini-grid {
+    display: grid; grid-template-columns: repeat(3, 18px);
+    grid-template-rows: repeat(3, 18px); gap: 1px;
+    background: #2a2a3e; padding: 2px; border-radius: 4px;
+  }
+  .recipe-mini-cell {
+    width: 18px; height: 18px;
+    background-color: #1a1a2e;
+    background-size: cover; image-rendering: pixelated;
+    border-radius: 2px;
+  }
+  .recipe-arrow {
+    font-size: 20px; color: var(--accent-dark);
+    font-family: 'Bungee', sans-serif;
+  }
+  .recipe-result-wrap { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 90px; }
+  .recipe-result-cell {
+    width: 40px; height: 40px;
+    background-color: #2a2a3e; border: 2px solid var(--accent);
+    border-radius: 6px; background-size: cover; image-rendering: pixelated;
+  }
+  .recipe-result-name { font-size: 10px; color: var(--dark); font-weight: 600; text-align: center; }
+  .recipe-tag {
+    position: absolute; top: 2px; right: 4px;
+    font-size: 9px; color: var(--accent-dark);
+    background: rgba(255, 215, 0, 0.2); padding: 1px 4px;
+    border-radius: 3px; font-family: 'Bungee', sans-serif;
+  }
+
+  #toast {
+    position: fixed; top: 88px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(26, 26, 46, 0.92);
+    color: white;
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-size: 13px;
+    z-index: 30;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    border: 2px solid var(--accent);
+  }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+  <div class="start-card">
+    <h1>FREE <span>CRAFT</span></h1>
+    <p>Sandbox voxel grátis — construa, plante, lute<br>e jogue com amigos via P2P!</p>
+
+    <svg width="120" height="120" viewBox="0 0 140 140" style="margin: 4px 0;">
+      <circle cx="35" cy="35" r="22" fill="#3a3a4a" stroke="#1a1a2e" stroke-width="3"/>
+      <circle cx="35" cy="35" r="13" fill="#ffb8b8"/>
+      <circle cx="105" cy="35" r="22" fill="#3a3a4a" stroke="#1a1a2e" stroke-width="3"/>
+      <circle cx="105" cy="35" r="13" fill="#ffb8b8"/>
+      <circle cx="70" cy="75" r="38" fill="#c8c8d0" stroke="#1a1a2e" stroke-width="3"/>
+      <ellipse cx="70" cy="88" rx="26" ry="22" fill="#fff7e6"/>
+      <circle cx="58" cy="72" r="6" fill="#1a1a2e"/>
+      <circle cx="82" cy="72" r="6" fill="#1a1a2e"/>
+      <circle cx="60" cy="70" r="2" fill="white"/>
+      <circle cx="84" cy="70" r="2" fill="white"/>
+      <ellipse cx="70" cy="88" rx="5" ry="4" fill="#1a1a2e"/>
+      <path d="M 60 98 Q 70 108 80 98" stroke="#1a1a2e" stroke-width="3" fill="none" stroke-linecap="round"/>
+    </svg>
+
+    <div class="controls-grid">
+      <div><b>Mover</b>WASD</div>
+      <div><b>Pular</b>Espaço</div>
+      <div><b>Olhar</b>Mouse</div>
+      <div><b>Correr</b>Shift</div>
+      <div><b>Quebrar</b>Segurar esq.</div>
+      <div><b>Colocar</b>Clique dir.</div>
+      <div><b>Hotbar</b>Teclas 1-9</div>
+      <div><b>Inventário</b>Tecla E</div>
+      <div><b>Receitas</b>Tecla R</div>
+      <div><b>Bola de Fogo</b>Tecla B</div>
+      <div><b>Atirar</b>Esq. (com arco/arma)</div>
+      <div><b>Abrir porta</b>Direito</div>
+      <div><b>Voar (criativo)</b>Espaço 2x ou F</div>
+      <div><b>Soltar mouse</b>Esc</div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:10px; align-items:center;">
+      <button class="play-btn" id="play-survival-btn" style="background:#2d8f4d;">⚔️ SOBREVIVÊNCIA</button>
+      <button class="play-btn" id="play-creative-btn" style="background:#5b8df0;">🛠️ CRIATIVO</button>
+      <div style="display:flex;gap:8px;margin-top:6px;">
+        <button class="play-btn small" id="mp-host-btn" style="background:#9c5b3e;">🌐 CRIAR SALA</button>
+        <button class="play-btn small" id="mp-join-btn" style="background:#6b4a8f;">🔗 ENTRAR</button>
+      </div>
+      <div id="mp-status" style="font-size:11px;color:#666;min-height:14px;font-family:'Fredoka',sans-serif;"></div>
+    </div>
+  </div>
+</div>
+
+<div id="crosshair"></div>
+
+<div id="top-hud">
+  <div class="avatar">
+    <svg width="50" height="50" viewBox="0 0 140 140">
+      <circle cx="35" cy="35" r="22" fill="#3a3a4a" stroke="#1a1a2e" stroke-width="3"/>
+      <circle cx="35" cy="35" r="13" fill="#ffb8b8"/>
+      <circle cx="105" cy="35" r="22" fill="#3a3a4a" stroke="#1a1a2e" stroke-width="3"/>
+      <circle cx="105" cy="35" r="13" fill="#ffb8b8"/>
+      <circle cx="70" cy="75" r="38" fill="#c8c8d0" stroke="#1a1a2e" stroke-width="3"/>
+      <ellipse cx="70" cy="88" rx="26" ry="22" fill="#fff7e6"/>
+      <circle cx="58" cy="72" r="6" fill="#1a1a2e"/>
+      <circle cx="82" cy="72" r="6" fill="#1a1a2e"/>
+      <ellipse cx="70" cy="88" rx="5" ry="4" fill="#1a1a2e"/>
+      <path d="M 60 98 Q 70 108 80 98" stroke="#1a1a2e" stroke-width="3" fill="none" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <div class="info-box">
+    <b>FREE-CRAFT</b>
+    <span id="pos-text">X: 0 | Y: 0 | Z: 0</span>
+    <span class="sub" id="tool-text">Mãos vazias</span>
+  </div>
+</div>
+
+<div id="right-hud">
+  <div id="mode-badge" style="background:#2d8f4d;color:white;font-family:'Bungee',sans-serif;font-size:11px;padding:6px 12px;border:3px solid #1a1a2e;border-radius:12px;letter-spacing:1px;box-shadow:3px 3px 0 #1a1a2e;">⚔️ SOBREVIVÊNCIA</div>
+  <div id="clock-hud">
+    <span id="clock-text">00:00</span>
+    <span class="phase" id="phase-text">Dia</span>
+  </div>
+  <div id="fireball-hud">
+    <span class="fb-icon">🔥</span>
+    <span id="fb-text">PRONTA</span>
+  </div>
+</div>
+
+<div id="stats-hud">
+  <div class="stat-bar" id="hp-bar" title="Vida"></div>
+  <div class="stat-bar" id="hunger-bar" title="Fome"></div>
+</div>
+
+<div id="hotbar"></div>
+
+<div id="inventory-modal">
+  <div class="inv-card">
+    <h2 id="inv-title">INVENTÁRIO</h2>
+    <div class="craft-section">
+      <span class="inv-section-title">CRAFT</span>
+      <div class="craft-grid size-2" id="craft-grid"></div>
+      <span class="craft-arrow">▶</span>
+      <div class="craft-result" id="craft-result"></div>
+    </div>
+    <div class="armor-row">
+      <div class="armor-section">
+        <div class="inv-section-title">ARMADURA</div>
+        <div class="armor-slots-grid" id="armor-slots"></div>
+      </div>
+      <div class="armor-section">
+        <div class="inv-section-title">SECUNDÁRIO</div>
+        <div class="armor-slots-grid" id="offhand-slot"></div>
+      </div>
+      <button class="play-btn small" id="open-recipes-btn" type="button">📖 RECEITAS (R)</button>
+    </div>
+    <div class="inv-section-title">MOCHILA</div>
+    <div class="grid-row" id="inv-main"></div>
+    <div class="grid-row" id="inv-row-2"></div>
+    <div class="grid-row" id="inv-row-3"></div>
+    <div class="grid-row hotbar-row" id="inv-hotbar"></div>
+    <div class="inv-hint">Clique num item para selecionar/posicionar · clique no resultado para fabricar · E fecha</div>
+  </div>
+</div>
+
+<div id="recipes-modal">
+  <div class="recipes-card">
+    <div class="recipes-header">
+      <h2>📖 LIVRO DE RECEITAS</h2>
+      <button class="play-btn small" id="close-recipes-btn" type="button">✕ FECHAR</button>
+    </div>
+    <div class="recipes-grid" id="recipes-grid"></div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+<div id="toast"></div>
+
+<!-- Three.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<!-- Módulos do jogo (ordem importa: dependências antes) -->
+<script src="js/utils.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/textures.js"></script>
+<script src="js/blocks.js"></script>
+<script src="js/lights.js"></script>
+<script src="js/doors.js"></script>
+<script src="js/torches.js"></script>
+<script src="js/fences.js"></script>
+<script src="js/beds.js"></script>
+<script src="js/plants.js"></script>
+<script src="js/multiplayer.js"></script>
+<script src="js/world.js"></script>
+<script src="js/water.js"></script>
+<script src="js/inventory.js"></script>
+<script src="js/crafting.js"></script>
+<script src="js/player.js"></script>
+<script src="js/drops.js"></script>
+<script src="js/npcs.js"></script>
+<script src="js/fireballs.js"></script>
+<script src="js/projectiles.js"></script>
+<script src="js/daynight.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/viewmodel.js"></script>
+<script src="js/mobile.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
