@@ -40,16 +40,24 @@
     if (!mesh) return;
     mesh.position.set(x, y, z);
     scene.add(mesh);
-    const angle = Math.random() * Math.PI * 2;
-    const force = opts.gentle ? 0.8 : 2.2;
-    list.push({
-      mesh, itemId, count,
-      pos: new THREE.Vector3(x, y, z),
-      vel: new THREE.Vector3(
+
+    // velocidade: customizada (opts.velocity) ou aleatória
+    let vel;
+    if (opts.velocity) {
+      vel = opts.velocity.clone();
+    } else {
+      const angle = Math.random() * Math.PI * 2;
+      const force = opts.gentle ? 0.8 : 2.2;
+      vel = new THREE.Vector3(
         Math.cos(angle) * force,
         2 + Math.random() * 1.5,
         Math.sin(angle) * force
-      ),
+      );
+    }
+    list.push({
+      mesh, itemId, count,
+      pos: new THREE.Vector3(x, y, z),
+      vel,
       life: 90,
       collectDelay: opts.collectDelay != null ? opts.collectDelay : 0.4,
       bobT: Math.random() * Math.PI * 2,

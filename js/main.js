@@ -387,6 +387,12 @@
       e.preventDefault();
     }
     if (e.code === 'KeyB' && locked) Game.fireballs.spawn();
+    // Q = jogar fora 1 do slot ativo (Ctrl+Q = stack inteiro)
+    if (e.code === 'KeyQ' && locked) {
+      const all = e.ctrlKey || e.metaKey;
+      dropFromActiveSlot(all);
+      e.preventDefault();
+    }
     // V = alterna câmera 1ª/3ª pessoa
     if (e.code === 'KeyV' && locked) {
       Game.cameraMode = Game.cameraMode === 'third' ? 'first' : 'third';
@@ -476,6 +482,31 @@
   let weaponCd = 0;
   let fireKickT = 0;        // 0..1, decai
   let fireKickStrength = 0; // intensidade do recoil
+
+  // Dropa item(ns) do slot ativo na direção do olhar, como uma entidade de
+  // drop que NÃO pode ser coletada pelos próximos ~2s.
+  function dropFromActiveSlot(takeStack = false) {
+    const idx = Game.inventory.getSelectedSlot();
+    const slot = Game.inventory.data[idx];
+    if (!slot) return;
+    const count = takeStack ? slot.count : 1;
+    const id = slot.id;
+    // remove do inventário
+    slot.count -= count;
+    if (slot.count <= 0) Game.inventory.data[idx] = null;
+    Game.ui.refresh();
+    // spawn à frente do player, com velocidade direcional
+    const dir = new THREE.Vector3(0, 0, -1)
+      .applyEuler(new THREE.Euler(Game.player.pitch, Game.player.yaw, 0, 'YXZ'));
+    const origin = Game.player.pos.clone().addScaledVector(dir, 0.7);
+    origin.y -= 0.3;
+    const vel = dir.multiplyScalar(5).add(new THREE.Vector3(0, 2.5, 0));
+    Game.drops.spawn(origin.x, origin.y, origin.z, id, count, {
+      velocity: vel,
+      collectDelay: 2.0,     // 2s de imunidade à coleta
+    });
+    if (Game.audio) Game.audio.play('place', { volume: 0.5 });
+  }
 
   function triggerFireRecoil(weaponType) {
     fireKickT = 1;

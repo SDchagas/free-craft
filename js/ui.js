@@ -43,6 +43,38 @@
     const close = document.getElementById('close-recipes-btn');
     if (open) open.addEventListener('click', () => openRecipesBook());
     if (close) close.addEventListener('click', () => closeRecipesBook());
+    // Lixeira: joga fora o item atualmente selecionado no inventário
+    const trash = document.getElementById('inv-trash');
+    if (trash) {
+      const handleTrash = (e) => {
+        if (e) e.preventDefault();
+        const cs = Game.crafting.state;
+        if (cs.selectedInvIdx < 0) {
+          Game.utils.showToast('Selecione um item primeiro');
+          return;
+        }
+        const idx = cs.selectedInvIdx;
+        const slot = Game.inventory.data[idx];
+        if (!slot) return;
+        const id = slot.id, count = slot.count;
+        Game.inventory.data[idx] = null;
+        cs.selectedInvIdx = -1;
+        // spawn no player como se jogasse fora
+        const dir = new THREE.Vector3(0, 0, -1)
+          .applyEuler(new THREE.Euler(Game.player.pitch, Game.player.yaw, 0, 'YXZ'));
+        const origin = Game.player.pos.clone().addScaledVector(dir, 0.7);
+        origin.y -= 0.3;
+        const vel = dir.multiplyScalar(5).add(new THREE.Vector3(0, 2.5, 0));
+        Game.drops.spawn(origin.x, origin.y, origin.z, id, count, {
+          velocity: vel, collectDelay: 2.0,
+        });
+        Game.utils.showToast(`🗑️ Jogou fora: ${Game.items[id].name} x${count}`);
+        if (Game.audio) Game.audio.play('click');
+        refresh();
+      };
+      trash.addEventListener('click', handleTrash);
+      trash.addEventListener('touchstart', handleTrash, { passive: false });
+    }
   }
 
   const _statCache = {};
