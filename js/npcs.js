@@ -678,23 +678,30 @@
     if (!scene) return;
     if (Game.player.mode === 'creative') return;
     const key = `${cx},${cz}`;
-    if (populatedChunks.has(key)) return;     // já populado nesta sessão de render
-    if (passiveCount() >= 30) return;         // teto generoso (despawnFar reduz)
+    if (populatedChunks.has(key)) return;
+    if (passiveCount() >= 60) return;        // teto bem mais generoso
     populatedChunks.add(key);
     const seed = ((cx * 73856093) ^ (cz * 19349663)) >>> 0;
     let s = seed;
     const rng = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
-    const count = Math.floor(rng() * 4);
-    for (let i = 0; i < count; i++) {
+    // quase todo chunk gera ao menos 1 mob (70% 2-3, 30% 1, 0% vazio)
+    const roll = rng();
+    const count = roll < 0.30 ? 1 : (roll < 0.75 ? 2 : (roll < 0.95 ? 3 : 4));
+    let placed = 0, attempts = 0;
+    while (placed < count && attempts < count * 6) {
+      attempts++;
       const lx = Math.floor(rng() * CHUNK);
       const lz = Math.floor(rng() * CHUNK);
       const x = cx * CHUNK + lx, z = cz * CHUNK + lz;
       const top = Game.world.topY(x, z);
       if (top <= 0) continue;
-      if (Game.world.get(x, top - 1, z) !== 1) continue;
-      const kinds = ['cow','cow','pig','sheep','sheep','horse','rat','rat'];
+      const ground = Game.world.get(x, top - 1, z);
+      // aceita grama ou terra (pra não perder chunks de bioma praia/trilha)
+      if (ground !== 1 && ground !== 2) continue;
+      const kinds = ['cow','cow','pig','pig','sheep','sheep','horse','rat','rat'];
       const kind = kinds[Math.floor(rng() * kinds.length)];
       spawn(x + 0.5, top - 0.5, z + 0.5, { kind });
+      placed++;
     }
   }
   function clearPopulated() { populatedChunks.clear(); }

@@ -919,22 +919,23 @@
       Game.npcs.spawnHostileNearby();
       hostileSpawnT = 18 + Math.random() * 12;
     }
-    if (!isNight && passiveSpawnT <= 0 && Game.npcs.passiveCount() < 14) {
+    if (!isNight && passiveSpawnT <= 0 && Game.npcs.passiveCount() < 30) {
       Game.npcs.spawnPassiveNearby();
-      passiveSpawnT = 8 + Math.random() * 10;
+      passiveSpawnT = 5 + Math.random() * 8;
     }
     if (!isNight && birdSpawnT <= 0) {
       Game.npcs.spawnBird();
-      birdSpawnT = 35 + Math.random() * 25;
+      birdSpawnT = 30 + Math.random() * 20;
     }
     if (fishSpawnT <= 0) {
       Game.npcs.spawnFish();
       fishSpawnT = 25 + Math.random() * 20;
     }
-    // Despawn de mobs muito longe (a cada 8s, raio 90 — bem conservador)
+    // Despawn só mesmo muito longe (raio 110). Dá tempo do player andar
+    // e voltar sem encontrar tudo vazio.
     if (despawnT <= 0) {
-      Game.npcs.despawnFar(90);
-      despawnT = 8;
+      Game.npcs.despawnFar(110);
+      despawnT = 10;
     }
   }
 
