@@ -663,7 +663,32 @@
     Game.world.ensureChunksAround(x, z);
     const kinds = ['cow', 'pig', 'sheep', 'sheep', 'horse', 'rat'];
     const kind = kinds[Math.floor(Math.random() * kinds.length)];
-    spawnAtSurface(x, z, { kind });
+    return spawnAtSurface(x, z, { kind });
+  }
+
+  // Popular um chunk recém-gerado com 0-3 passivos.
+  // Chamada no fim de world.generateChunkData → mobs ficam distribuídos
+  // pelo mapa em qualquer direção que o jogador caminhe.
+  function populateChunk(cx, cz, CHUNK) {
+    if (!scene) return;
+    if (Game.player.mode === 'creative') return;  // sem mobs no creative
+    if (passiveCount() >= 24) return;             // teto global
+    const seed = ((cx * 73856093) ^ (cz * 19349663)) >>> 0;
+    let s = seed;
+    const rng = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+    const count = Math.floor(rng() * 4);  // 0, 1, 2 ou 3
+    for (let i = 0; i < count; i++) {
+      const lx = Math.floor(rng() * CHUNK);
+      const lz = Math.floor(rng() * CHUNK);
+      const x = cx * CHUNK + lx, z = cz * CHUNK + lz;
+      const top = Game.world.topY(x, z);
+      if (top <= 0) continue;
+      // só spawna em grama
+      if (Game.world.get(x, top - 1, z) !== 1) continue;
+      const kinds = ['cow','cow','pig','sheep','sheep','horse','rat','rat'];
+      const kind = kinds[Math.floor(rng() * kinds.length)];
+      spawn(x + 0.5, top - 0.5, z + 0.5, { kind });
+    }
   }
 
   // Despawna mobs muito longe do player pra controlar a quantidade total.
@@ -684,7 +709,7 @@
   Game.npcs = {
     list, bindScene, spawn, spawnAtSurface, spawnInitial,
     spawnTomNearby, spawnHostileNearby, spawnBird, spawnFish, spawnGolemAt,
-    spawnPassiveNearby, despawnFar,
+    spawnPassiveNearby, despawnFar, populateChunk,
     update, damage, tomCount, hostileCount, passiveCount,
   };
 })();

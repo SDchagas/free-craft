@@ -252,6 +252,11 @@
           }
       }
     }
+
+    // popula o chunk com 0-3 mobs passivos (cada chunk tem fauna própria)
+    if (Game.npcs && Game.npcs.populateChunk) {
+      Game.npcs.populateChunk(cx, cz, CHUNK);
+    }
   }
 
   // Variantes de árvore — alturas, tamanhos e formatos de copa diferentes
