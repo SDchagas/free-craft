@@ -58,6 +58,11 @@
   }
 
   // ---------- World setup ----------
+  // IMPORTANTE: TODOS os bindScene precisam acontecer ANTES de generate,
+  // porque a geração inicial chama loadChunkRender, que por sua vez chama
+  // populateChunk/loadChunk em vários módulos. Se a scene ainda não foi
+  // bindada num módulo, o early-return faz com que aquele chunk nunca
+  // seja processado por ele.
   Game.world.bindScene(scene);
   Game.lights.bindScene(scene);
   Game.doors.bindScene(scene);
@@ -65,14 +70,14 @@
   Game.fences.bindScene(scene);
   Game.beds.bindScene(scene);
   Game.plants.bindScene(scene);
-  if (Game.tnt) Game.tnt.bindScene(scene);
-  if (Game.multiplayer) Game.multiplayer.bindScene(scene);
-  Game.world.generate();
-  Game.water.initializeFromWorld();
   Game.drops.bindScene(scene);
   Game.npcs.bindScene(scene);
   Game.fireballs.bindScene(scene, camera);
   Game.projectiles.bindScene(scene, camera);
+  if (Game.tnt) Game.tnt.bindScene(scene);
+  if (Game.multiplayer) Game.multiplayer.bindScene(scene);
+  Game.world.generate();
+  Game.water.initializeFromWorld();
   Game.daynight.bind({ scene, sun, sunMesh, ambient, hemi, camera });
   Game.npcs.spawnInitial();
 
