@@ -215,7 +215,7 @@
       }
     }
 
-    // árvores
+    // árvores (4 formas diferentes pra evitar paisagem monótona)
     const treeCount = Math.floor(treeRng() * 4);
     for (let i = 0; i < treeCount; i++) {
       const lx = Math.floor(treeRng() * (CHUNK - 4)) + 2;
@@ -225,20 +225,11 @@
       if (top <= 0) continue;
       const groundType = get(tx, top - 1, tz);
       if (groundType !== 1) continue;
-      const trunkH = 4 + Math.floor(treeRng() * 2);
-      for (let j = 0; j < trunkH; j++) set(tx, top + j, tz, 4);
-      const tt = top + trunkH;
-      for (let dx = -2; dx <= 2; dx++)
-        for (let dz = -2; dz <= 2; dz++)
-          for (let dy = -1; dy <= 2; dy++) {
-            const d = Math.sqrt(dx * dx + dz * dz + dy * dy * 0.7);
-            if (d < 2.6 && get(tx + dx, tt + dy, tz + dz) === 0 && treeRng() < 0.85) {
-              set(tx + dx, tt + dy, tz + dz, 5);
-            }
-          }
+      const variant = Math.floor(treeRng() * 4);
+      growTreeVariant(tx, top, tz, variant, treeRng);
     }
 
-    // lago raro
+    // lago raro (1 a cada ~20 chunks)
     if (treeRng() < 0.05) {
       const lx = Math.floor(CHUNK / 2), lz = Math.floor(CHUNK / 2);
       const cxw = x0 + lx, czw = z0 + lz;
@@ -254,6 +245,78 @@
             }
           }
       }
+    }
+  }
+
+  // Variantes de árvore — alturas, tamanhos e formatos de copa diferentes
+  function growTreeVariant(tx, ty, tz, variant, rng) {
+    rng = rng || Math.random;
+    const r = () => (typeof rng === 'function' ? rng() : Math.random());
+    if (variant === 0) {
+      // Carvalho pequeno: tronco curto, copa esférica média
+      const trunkH = 4 + Math.floor(r() * 2);
+      for (let j = 0; j < trunkH; j++) set(tx, ty + j, tz, 4);
+      const tt = ty + trunkH;
+      const radius = 2.4;
+      for (let dx = -2; dx <= 2; dx++)
+        for (let dz = -2; dz <= 2; dz++)
+          for (let dy = -1; dy <= 2; dy++) {
+            const d = Math.sqrt(dx*dx + dz*dz + dy*dy * 0.7);
+            if (d < radius && get(tx+dx, tt+dy, tz+dz) === 0 && r() < 0.85) set(tx+dx, tt+dy, tz+dz, 5);
+          }
+    } else if (variant === 1) {
+      // Alta e estreita: tronco 7-9, copa pequena no topo
+      const trunkH = 7 + Math.floor(r() * 3);
+      for (let j = 0; j < trunkH; j++) set(tx, ty + j, tz, 4);
+      const tt = ty + trunkH;
+      for (let dx = -1; dx <= 1; dx++)
+        for (let dz = -1; dz <= 1; dz++)
+          for (let dy = -1; dy <= 1; dy++) {
+            const d = Math.abs(dx) + Math.abs(dz) + Math.abs(dy);
+            if (d < 2.5 && get(tx+dx, tt+dy, tz+dz) === 0) set(tx+dx, tt+dy, tz+dz, 5);
+          }
+      // ponta
+      set(tx, tt + 1, tz, 5);
+    } else if (variant === 2) {
+      // Carvalho largo: tronco 5, copa larga 3 layers
+      const trunkH = 5 + Math.floor(r() * 2);
+      for (let j = 0; j < trunkH; j++) set(tx, ty + j, tz, 4);
+      const tt = ty + trunkH;
+      // 3 camadas: maior na base, menor no topo
+      const layers = [
+        { dy:  -1, rad: 3 },
+        { dy:   0, rad: 2.5 },
+        { dy:   1, rad: 2 },
+        { dy:   2, rad: 1.4 },
+      ];
+      for (const L of layers) {
+        const ri = Math.ceil(L.rad);
+        for (let dx = -ri; dx <= ri; dx++)
+          for (let dz = -ri; dz <= ri; dz++) {
+            const d = Math.sqrt(dx*dx + dz*dz);
+            if (d < L.rad && get(tx+dx, tt+L.dy, tz+dz) === 0 && r() < 0.92) {
+              set(tx+dx, tt+L.dy, tz+dz, 5);
+            }
+          }
+      }
+    } else {
+      // Pinheiro cônico: tronco 6, copa de "andares" diminuindo
+      const trunkH = 6 + Math.floor(r() * 3);
+      for (let j = 0; j < trunkH; j++) set(tx, ty + j, tz, 4);
+      const tt = ty + trunkH - 4;
+      // 4 andares cônicos
+      for (let layer = 0; layer < 4; layer++) {
+        const yy = tt + layer * 1;
+        const rad = Math.max(0.5, 2.2 - layer * 0.55);
+        const ri = Math.ceil(rad);
+        for (let dx = -ri; dx <= ri; dx++)
+          for (let dz = -ri; dz <= ri; dz++) {
+            const d = Math.sqrt(dx*dx + dz*dz);
+            if (d < rad && get(tx+dx, yy, tz+dz) === 0) set(tx+dx, yy, tz+dz, 5);
+          }
+      }
+      // ponta
+      set(tx, tt + 4, tz, 5);
     }
   }
 

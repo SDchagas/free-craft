@@ -88,34 +88,53 @@
   crackMesh.visible = false;
   scene.add(crackMesh);
 
-  // ---------- Mão 3D ----------
+  // ---------- Mão 3D estilo Minecraft ----------
+  // Estilo MC: manga (cor camisa) + mão (cor pele), em forma de cubos blocky.
+  // Cores vêm de Game.skin pra acompanhar customização.
   const hand = new THREE.Group();
-  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.5, 0.18),
-    new THREE.MeshLambertMaterial({ color: 0xc8c8d0 }));
-  arm.position.y = -0.25; hand.add(arm);
-  const cuff = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.08, 0.24),
-    new THREE.MeshLambertMaterial({ color: 0xff4757 }));
-  cuff.position.y = 0.04; hand.add(cuff);
-  // luva + dedos vão num decor group separado, ocultado quando há ferramenta
-  const handDecor = new THREE.Group();
-  const glove = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 0.3),
-    new THREE.MeshLambertMaterial({ color: 0xfff7e6 }));
-  glove.position.y = 0.18; handDecor.add(glove);
-  const lineMat = new THREE.MeshBasicMaterial({ color: 0x1a1a2e });
-  for (let i = -1; i <= 1; i++) {
-    const line = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.1, 0.015), lineMat);
-    line.position.set(i * 0.09, 0.24, 0.151);
-    handDecor.add(line);
+  let armSleeveMesh, armHandMesh;
+  function buildHandModel() {
+    // limpa filhos antigos (mantém o toolGroup do viewmodel se já tem)
+    const toRemove = [];
+    for (const c of hand.children) if (c !== Game.viewmodel?._toolGroupRef) toRemove.push(c);
+    for (const c of toRemove) hand.remove(c);
+
+    const c = Game.skin ? Game.skin.all() : { shirt: '#3a8fd0', skin: '#f1c19a' };
+    // Manga (parte de cima, mais larga e curta)
+    armSleeveMesh = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.45, 0.30),
+      new THREE.MeshLambertMaterial({ color: c.shirt }));
+    armSleeveMesh.position.y = -0.15;
+    hand.add(armSleeveMesh);
+    // Mão de pele
+    armHandMesh = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.20, 0.30),
+      new THREE.MeshLambertMaterial({ color: c.skin }));
+    armHandMesh.position.y = 0.18;
+    hand.add(armHandMesh);
   }
+  buildHandModel();
+  // expõe pra o módulo skin re-construir quando cores mudarem
+  Game.rebuildHandModel = buildHandModel;
+  // decor = manga + mão (some quando há ferramenta segurada)
+  const handDecor = new THREE.Group();
   hand.add(handDecor);
+  // wrappers pra viewmodel poder esconder
+  handDecor.userData.hideOnTool = () => {
+    if (armSleeveMesh) armSleeveMesh.visible = false;
+    if (armHandMesh)   armHandMesh.visible   = false;
+  };
+  handDecor.userData.showWhenEmpty = () => {
+    if (armSleeveMesh) armSleeveMesh.visible = true;
+    if (armHandMesh)   armHandMesh.visible   = true;
+  };
   const HAND_REST = { x: 0.35, y: -0.35, z: -0.55, rotX: 0.1, rotY: 0, rotZ: -0.2 };
   hand.position.set(HAND_REST.x, HAND_REST.y, HAND_REST.z);
   hand.rotation.set(HAND_REST.rotX, HAND_REST.rotY, HAND_REST.rotZ);
   camera.add(hand);
 
   // viewmodel (mesh do item segurado) — vive dentro da mão.
-  // Passa handDecor pra ser ocultado quando há tool segurada.
   Game.viewmodel.init(hand, handDecor);
+  // player mesh (3ª pessoa)
+  if (Game.playermesh) Game.playermesh.init(scene);
   function syncViewmodel() {
     const id = Game.inventory.getActiveId();
     Game.viewmodel.setItem(id);
@@ -353,6 +372,13 @@
       e.preventDefault();
     }
     if (e.code === 'KeyB' && locked) Game.fireballs.spawn();
+    // V = alterna câmera 1ª/3ª pessoa
+    if (e.code === 'KeyV' && locked) {
+      Game.cameraMode = Game.cameraMode === 'third' ? 'first' : 'third';
+      Game.utils.showToast(Game.cameraMode === 'third' ? '🎥 3ª pessoa' : '🎥 1ª pessoa');
+      hand.visible = Game.cameraMode === 'first';
+      if (Game.playermesh) Game.playermesh.setVisible(Game.cameraMode === 'third');
+    }
     // Espaço duplo (em creative) = toggle fly
     if (e.code === 'Space' && locked && Game.player.mode === 'creative') {
       const now = performance.now() / 1000;
@@ -852,10 +878,17 @@
       moving = res.moving;
     }
 
-    camera.position.copy(Game.player.pos);
     camera.rotation.order = 'YXZ';
     camera.rotation.y = Game.player.yaw;
     camera.rotation.x = Game.player.pitch;
+    if (Game.cameraMode === 'third') {
+      // câmera atrás e levemente acima do player
+      const back = new THREE.Vector3(0, 0, 1).applyEuler(new THREE.Euler(Game.player.pitch, Game.player.yaw, 0, 'YXZ'));
+      camera.position.copy(Game.player.pos).addScaledVector(back, 4).add(new THREE.Vector3(0, 0.5, 0));
+    } else {
+      camera.position.copy(Game.player.pos);
+    }
+    if (Game.playermesh) Game.playermesh.update(dt);
 
     if (locked) updateMining(dt);
     animateHand(dt, moving);
@@ -906,4 +939,5 @@
   Game.scene = scene;
   Game.camera = camera;
   Game.renderer = renderer;
+  Game.cameraMode = 'first';
 })();

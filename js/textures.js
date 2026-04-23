@@ -93,45 +93,54 @@
     }
   });
 
-  // Folhas: gera N variantes com seed diferente pra evitar padrão visível.
-  function makeLeavesTex(seed) {
+  // Folhas: cada variante tem paleta distinta (verdes/oliva/amarelado/azul-acinzentado).
+  // Mais buracos transparentes pra parecer copa real e menos um "cubo de folhas".
+  function makeLeavesTex(seed, palette) {
     return makeTex((ctx, s) => {
       const rng = mulberry32(seed);
-      ctx.fillStyle = '#1e5a22';
+      // base: começa transparente e pinta clusters de folha
+      ctx.clearRect(0, 0, s, s);
+      // fundo escuro (canopy interna)
+      ctx.fillStyle = palette.shadow;
       ctx.fillRect(0, 0, s, s);
-      for (let i = 0; i < 38; i++) {
+      // tufos densos (clusters de 2-4 pixels)
+      for (let i = 0; i < 50; i++) {
         const x = Math.floor(rng() * s);
         const y = Math.floor(rng() * s);
         const r = rng();
-        const sz = r < 0.6 ? 2 : 3;
-        let col;
-        if (r < 0.20) col = '#2E7D32';
-        else if (r < 0.55) col = '#3ea94a';
-        else if (r < 0.85) col = '#4caf50';
-        else col = '#7ed186';
+        const sz = r < 0.5 ? 2 : (r < 0.85 ? 3 : 4);
+        const col = r < 0.20 ? palette.dark
+                  : r < 0.55 ? palette.mid
+                  : r < 0.85 ? palette.light
+                             : palette.bright;
         ctx.fillStyle = col;
         ctx.fillRect(x, y, sz, sz);
       }
-      for (let i = 0; i < 12; i++) {
-        ctx.fillStyle = '#a8e0b0';
+      // pixels luminosos (refletindo sol)
+      for (let i = 0; i < 14; i++) {
+        ctx.fillStyle = palette.bright;
         ctx.fillRect(Math.floor(rng() * s), Math.floor(rng() * s), 1, 1);
       }
-      for (let i = 0; i < 18; i++) {
+      // muitos buracos pra silhueta natural (~30 por textura)
+      for (let i = 0; i < 30; i++) {
         const x = Math.floor(rng() * s);
         const y = Math.floor(rng() * s);
         ctx.clearRect(x, y, 1, 1);
-        if (rng() < 0.4) ctx.clearRect(x + 1, y, 1, 1);
+        if (rng() < 0.5) ctx.clearRect((x + 1) % s, y, 1, 1);
+        if (rng() < 0.3) ctx.clearRect(x, (y + 1) % s, 1, 1);
       }
-      for (let i = 0; i < 10; i++) {
-        ctx.fillStyle = 'rgba(8,30,12,0.5)';
+      // sombras profundas
+      for (let i = 0; i < 14; i++) {
+        ctx.fillStyle = 'rgba(5,20,8,0.55)';
         ctx.fillRect(Math.floor(rng() * s), Math.floor(rng() * s), 1, 1);
       }
     });
   }
-  TEX.leaves  = makeLeavesTex(4004);
-  TEX.leaves2 = makeLeavesTex(4101);
-  TEX.leaves3 = makeLeavesTex(4202);
-  TEX.leaves4 = makeLeavesTex(4303);
+  // 4 paletas distintas: verde-floresta, verde-claro, oliva-amarelado, verde-azulado
+  TEX.leaves  = makeLeavesTex(4004, { shadow:'#1a4015', dark:'#2a6a25', mid:'#3a8a32', light:'#52a945', bright:'#82c46a' });
+  TEX.leaves2 = makeLeavesTex(4101, { shadow:'#1f3d12', dark:'#3a6a18', mid:'#5a8d28', light:'#7aac3a', bright:'#a8d166' });
+  TEX.leaves3 = makeLeavesTex(4202, { shadow:'#2a4010', dark:'#4a6a12', mid:'#6e8d22', light:'#94ad3a', bright:'#c8d575' });
+  TEX.leaves4 = makeLeavesTex(4303, { shadow:'#1a3b30', dark:'#2c6048', mid:'#3e8862', light:'#5fae84', bright:'#8fd1a5' });
 
   TEX.cheese = makeTex((ctx, s) => {
     ctx.fillStyle = '#FFD966'; ctx.fillRect(0, 0, s, s);
@@ -531,33 +540,80 @@
     ctx.fillRect(7, 4, 2, 1);
   });
 
-  // Texturas de quebra (10 estágios)
-  const breakTex = [];
-  for (let stage = 0; stage < 10; stage++) {
-    const t = makeTex((ctx, s) => {
-      ctx.clearRect(0, 0, s, s);
-      const rng = mulberry32(stage * 7919 + 1);
-      const intensity = stage / 9;
-      ctx.fillStyle = `rgba(0,0,0,${0.3 + intensity * 0.4})`;
-      const dots = Math.floor(8 + stage * 14);
-      for (let i = 0; i < dots; i++) ctx.fillRect(Math.floor(rng() * s), Math.floor(rng() * s), 1, 1);
-      ctx.strokeStyle = `rgba(0,0,0,${0.5 + intensity * 0.4})`; ctx.lineWidth = 1;
-      const cracks = stage + 1;
-      for (let i = 0; i < cracks; i++) {
-        ctx.beginPath();
-        let x = rng() * s, y = rng() * s;
-        ctx.moveTo(x, y);
-        const segs = 2 + Math.floor(rng() * 3);
-        for (let j = 0; j < segs; j++) {
-          x += (rng() - 0.5) * s * 0.6;
-          y += (rng() - 0.5) * s * 0.6;
-          ctx.lineTo(x, y);
+  // Texturas de quebra (10 estágios) — rachaduras conectadas estilo Minecraft.
+  // Cada estágio acumula linhas-pixel ramificadas a partir de pontos focais.
+  // Tudo gerado uma vez com mesmo seed pra que estágios cresçam organicamente
+  // (estágio N+1 adiciona detalhes ao estágio N).
+  const breakTex = (() => {
+    const SIZE = 16;
+    const stages = 10;
+    const out = [];
+    // Pré-calcula pixels acumulados por estágio
+    const pixels = [];          // Array<Set<"x,y">>  cada um é o conjunto acumulado
+    const rng = mulberry32(99173);
+    let acc = new Set();
+    // Pontos focais (3 centros das rachaduras)
+    const focals = [];
+    for (let i = 0; i < 3; i++) {
+      focals.push({ x: 2 + Math.floor(rng() * (SIZE - 4)), y: 2 + Math.floor(rng() * (SIZE - 4)) });
+    }
+    // Pra cada estágio, "cresce" a rachadura adicionando segmentos
+    for (let stage = 0; stage < stages; stage++) {
+      // estágio 0: vazio (sem rachadura visível)
+      if (stage > 0) {
+        // a cada estágio, adiciona N novos segmentos
+        const segs = 2 + stage * 2;
+        for (let s = 0; s < segs; s++) {
+          // escolhe um focal pra ramificar OU expande um pixel existente
+          const focal = focals[Math.floor(rng() * focals.length)];
+          let x = focal.x, y = focal.y;
+          // se já tem pixels acumulados, começa de um deles ocasionalmente
+          if (acc.size > 0 && rng() < 0.5) {
+            const arr = Array.from(acc);
+            const start = arr[Math.floor(rng() * arr.length)].split(',').map(Number);
+            x = start[0]; y = start[1];
+          }
+          const len = 2 + Math.floor(rng() * 3);
+          let dx = (rng() - 0.5) * 2;
+          let dy = (rng() - 0.5) * 2;
+          // discretiza direção pra cardinais/diagonais
+          dx = Math.sign(dx) || (rng() < 0.5 ? -1 : 1);
+          dy = Math.sign(dy) || (rng() < 0.5 ? -1 : 1);
+          for (let j = 0; j < len; j++) {
+            x += dx; y += dy;
+            // pequenas viradas
+            if (rng() < 0.3) dx = (rng() < 0.5 ? -1 : 1);
+            if (rng() < 0.3) dy = (rng() < 0.5 ? -1 : 1);
+            const px = ((x % SIZE) + SIZE) % SIZE;
+            const py = ((y % SIZE) + SIZE) % SIZE;
+            acc.add(`${px},${py}`);
+          }
         }
-        ctx.stroke();
       }
-    });
-    breakTex.push(t);
-  }
+      pixels.push(new Set(acc));
+    }
+
+    for (let stage = 0; stage < stages; stage++) {
+      const tex = makeTex((ctx, s) => {
+        ctx.clearRect(0, 0, s, s);
+        const intensity = stage / 9;
+        // pixels da rachadura (escuros)
+        ctx.fillStyle = `rgba(0,0,0,${0.6 + intensity * 0.35})`;
+        for (const key of pixels[stage]) {
+          const [x, y] = key.split(',').map(Number);
+          ctx.fillRect(x, y, 1, 1);
+        }
+        // borda mais clara (efeito 3D de quebra)
+        ctx.fillStyle = `rgba(255,255,255,${0.06 + intensity * 0.10})`;
+        for (const key of pixels[stage]) {
+          const [x, y] = key.split(',').map(Number);
+          if (!pixels[stage].has(`${x + 1},${y}`)) ctx.fillRect((x + 1) % s, y, 1, 1);
+        }
+      }, SIZE);
+      out.push(tex);
+    }
+    return out;
+  })();
 
   // ---------- Ícones de itens / ferramentas ----------
   function makeFlatIcon(bgColor, accent) {

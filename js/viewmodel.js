@@ -343,10 +343,13 @@
     if (currentItemId === itemId) return;
     currentItemId = itemId;
     if (!toolGroup) return;
-    // limpa
     while (toolGroup.children.length) toolGroup.remove(toolGroup.children[0]);
-    // mostra/esconde luva: se tem ferramenta, esconde a glove pra não sobrepor
-    if (decorGroup) decorGroup.visible = !itemId;
+    // mostra/esconde mão+manga
+    if (decorGroup) {
+      decorGroup.visible = true;  // group sempre visível, controla via hooks
+      if (itemId && decorGroup.userData.hideOnTool) decorGroup.userData.hideOnTool();
+      else if (decorGroup.userData.showWhenEmpty)   decorGroup.userData.showWhenEmpty();
+    }
     if (!itemId) return;
     const mesh = buildModel(itemId);
     if (!mesh) return;
@@ -356,9 +359,15 @@
     toolGroup.rotation.set(pose.r[0], pose.r[1], pose.r[2]);
   }
 
+  // chamado quando o skin muda — refaz a mão/manga com novas cores
+  function refreshSkin() {
+    // o handModel é construído em main.js — chama o hook
+    if (Game.rebuildHandModel) Game.rebuildHandModel();
+  }
+
   function getCurrentDef() {
     return currentItemId ? Game.items[currentItemId] : null;
   }
 
-  Game.viewmodel = { init, setItem, getCurrentDef };
+  Game.viewmodel = { init, setItem, getCurrentDef, refreshSkin };
 })();
