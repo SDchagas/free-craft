@@ -27,15 +27,15 @@
   function createUI() {
     const wrap = document.createElement('div');
     wrap.id = 'mobile-ui';
+    // Botões essenciais apenas: pular, fireball, fly (creative).
+    // Atacar = tap rápido na tela; Colocar = pressionar (hold) na tela.
+    // Inventário = ícone discreto na hotbar (gerenciado em ui.js).
     wrap.innerHTML = `
       <div id="mob-stick"><div id="mob-stick-knob"></div></div>
       <div id="mob-buttons">
-        <button class="mob-btn" data-act="jump">⤴</button>
-        <button class="mob-btn" data-act="attack">⛏</button>
-        <button class="mob-btn" data-act="place">+</button>
-        <button class="mob-btn" data-act="inv">🎒</button>
-        <button class="mob-btn" data-act="fly">✈</button>
-        <button class="mob-btn" data-act="recipes">📖</button>
+        <button class="mob-btn" data-act="jump" title="Pular">⤴</button>
+        <button class="mob-btn" data-act="fire"  title="Bola de Fogo">🔥</button>
+        <button class="mob-btn mob-btn-fly" data-act="fly" title="Voar">✈</button>
       </div>
     `;
     document.body.appendChild(wrap);
@@ -134,19 +134,33 @@
     checkOrientation();
   }
 
-  // Tenta entrar em fullscreen + lock orientação landscape.
+  // Tenta entrar em fullscreen + lock orientação landscape de forma agressiva.
+  // Usa o documento inteiro (não só o canvas) pra cobrir toda a UI.
   function requestFullscreenAndLandscape() {
     const el = document.documentElement;
-    const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen;
-    if (req) {
-      req.call(el).then(() => {
-        if (screen.orientation && screen.orientation.lock) {
-          screen.orientation.lock('landscape').catch(() => {});
+    const tryFs = () => {
+      const req = el.requestFullscreen || el.webkitRequestFullscreen
+                || el.mozRequestFullScreen || el.msRequestFullscreen;
+      if (req) {
+        const p = req.call(el, { navigationUI: 'hide' });
+        if (p && p.then) {
+          p.then(lockLandscape).catch(() => lockLandscape());
+        } else {
+          lockLandscape();
         }
-      }).catch(() => {});
-    } else if (screen.orientation && screen.orientation.lock) {
-      screen.orientation.lock('landscape').catch(() => {});
-    }
+      } else {
+        lockLandscape();
+      }
+    };
+    const lockLandscape = () => {
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(() => {});
+      }
+    };
+    tryFs();
+    // Truque iOS Safari: scrollTo(0,1) após pequeno delay esconde a barra
+    setTimeout(() => { window.scrollTo(0, 1); }, 100);
+    setTimeout(() => { window.scrollTo(0, 1); }, 500);
   }
 
   function init() {
@@ -201,6 +215,11 @@
       let holdTriggered = false;
       let holdTimer = null;
 
+      // Touch no canvas:
+      //   • Tap curto (<300ms, parado)        → click esquerdo (atacar/minerar 1 swing)
+      //   • Hold prolongado (>=400ms parado)   → click direito (colocar bloco / interagir)
+      //   • Mover dedo                          → pan da câmera (sempre ativo)
+      // Se segura mais tempo após tap, continua atacando (mining repetido).
       renderer.addEventListener('touchstart', e => {
         e.preventDefault();
         if (panTouchId != null) return;
@@ -212,13 +231,14 @@
         startT = performance.now();
         moved = 0;
         holdTriggered = false;
+        // hold longo (sem mover) → coloca bloco (click direito)
         clearTimeout(holdTimer);
         holdTimer = setTimeout(() => {
-          if (panTouchId != null && moved < 18) {
+          if (panTouchId != null && moved < 18 && !holdTriggered) {
             holdTriggered = true;
-            Game.mobile._attack(true);
+            Game.mobile._place();
           }
-        }, 250);
+        }, 400);
       }, { passive: false });
       renderer.addEventListener('touchmove', e => {
         for (const t of e.changedTouches) {
@@ -238,11 +258,11 @@
           panTouchId = null;
           clearTimeout(holdTimer);
           const dt = performance.now() - startT;
-          if (holdTriggered) {
-            Game.mobile._attack(false);  // solta o minerar
-          } else if (dt < 250 && moved < 18) {
-            // tap curto → coloca bloco
-            Game.mobile._place();
+          // se NÃO virou hold-to-place e foi um tap rápido sem muito movimento → ataca
+          if (!holdTriggered && dt < 400 && moved < 18) {
+            Game.mobile._attack(true);
+            // simula click rápido (libera após pequeno intervalo pra completar 1 swing)
+            setTimeout(() => Game.mobile._attack(false), 80);
           }
           moved = 0;
         }
@@ -255,21 +275,22 @@
       btn.addEventListener('touchstart', e => {
         e.preventDefault();
         if (act === 'jump') setKey('Space', true);
-        if (act === 'attack') Game.mobile._attack(true);
-        if (act === 'place') Game.mobile._place();
-        if (act === 'inv') {
-          if (Game.crafting.state.open) Game.ui.closeInventory();
-          else Game.ui.openInventory(2);
-        }
+        if (act === 'fire') Game.fireballs && Game.fireballs.spawn();
         if (act === 'fly') Game.physics.toggleFly && Game.physics.toggleFly();
-        if (act === 'recipes') Game.ui.openRecipesBook();
       }, { passive: false });
       btn.addEventListener('touchend', e => {
         e.preventDefault();
         if (act === 'jump') setKey('Space', false);
-        if (act === 'attack') Game.mobile._attack(false);
       }, { passive: false });
     });
+
+    // mostra/esconde botão de voar baseado no modo
+    function refreshButtons() {
+      const flyBtn = document.querySelector('.mob-btn-fly');
+      if (flyBtn) flyBtn.style.display = (Game.player && Game.player.mode === 'creative') ? '' : 'none';
+    }
+    setInterval(refreshButtons, 500);
+    refreshButtons();
 
     // sem pointer lock no mobile — bypass do start screen
     Game.mobile.usesTouch = true;

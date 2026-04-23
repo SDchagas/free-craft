@@ -122,12 +122,29 @@
           el.appendChild(cnt);
         }
       }
-      el.addEventListener('click', () => {
+      // tap/click seleciona slot (sem requerer pointerlock)
+      const select = (e) => {
+        if (e) e.preventDefault();
         Game.inventory.setSelectedSlot(i);
         if (Game.audio) Game.audio.play('select');
-      });
+      };
+      el.addEventListener('click', select);
+      el.addEventListener('touchstart', select, { passive: false });
       hotbarEl.appendChild(el);
     }
+    // Botão "mochila" discreto após os 9 slots — abre o inventário
+    const bag = document.createElement('div');
+    bag.className = 'slot bag-slot';
+    bag.title = 'Inventário';
+    bag.innerHTML = '<div class="bag-icon">🎒</div>';
+    const openInv = (e) => {
+      if (e) e.preventDefault();
+      if (Game.crafting && Game.crafting.state.open) Game.ui.closeInventory();
+      else Game.ui.openInventory(2);
+    };
+    bag.addEventListener('click', openInv);
+    bag.addEventListener('touchstart', openInv, { passive: false });
+    hotbarEl.appendChild(bag);
   }
 
   function buildInventoryGrid() {
